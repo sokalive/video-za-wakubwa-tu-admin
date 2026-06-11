@@ -50,6 +50,23 @@ async function main() {
   if (!process.env.JWT_SECRET) warn("JWT_SECRET", "not set — using default (not safe for production)");
   else pass("JWT_SECRET");
 
+  console.log("\n1b. Google Drive Upload");
+  const driveJson = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON;
+  const driveFolder = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (!driveJson) warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "not set — video file upload disabled (paste links only)");
+  else pass("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON");
+  if (!driveFolder) warn("GOOGLE_DRIVE_FOLDER_ID", "not set — video file upload disabled");
+  else pass("GOOGLE_DRIVE_FOLDER_ID");
+  if (driveJson && driveFolder) {
+    try {
+      const sa = JSON.parse(driveJson);
+      if (sa.client_email) pass(`Drive service account (${sa.client_email})`);
+      else warn("Drive service account", "JSON missing client_email");
+    } catch {
+      warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "invalid JSON");
+    }
+  }
+
   if (!url || !serviceKey) {
     console.log("\nCannot continue without Supabase credentials.\n");
     process.exit(1);

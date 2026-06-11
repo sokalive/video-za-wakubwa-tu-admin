@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Upload, Film } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatNumber } from "@/lib/utils";
+import { formatBytes } from "@/lib/drive-upload";
 import type { Video } from "@/types";
 
 const emptyVideo = {
@@ -45,7 +46,10 @@ export default function VideosPage() {
   const [form, setForm] = useState(emptyVideo);
   const [tagInput, setTagInput] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data, isLoading } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -59,6 +63,14 @@ export default function VideosPage() {
     queryKey: ["categories"],
     queryFn: () => api.categories.list(),
   });
+
+  const { data: driveStatus } = useQuery({
+    queryKey: ["drive", "status"],
+    queryFn: () => api.drive.status(),
+    staleTime: 60_000,
+  });
+
+  const driveConfigured = driveStatus?.configured ?? false;
 
   const createMutation = useMutation({
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
@@ -93,6 +105,9 @@ export default function VideosPage() {
     setForm(emptyVideo);
     setTagInput("");
     setThumbnailFile(null);
+    setVideoFile(null);
+    setUploadProgress(0);
+    setUploadPhase("");
   };
 
   const openCreate = () => {
@@ -112,27 +127,56 @@ export default function VideosPage() {
       isFeatured: video.isFeatured,
       tags: video.tags,
     });
+    setVideoFile(null);
+    setUploadProgress(0);
+    setUploadPhase("");
     setDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const hasDriveLink = !!form.googleDriveUrl.trim();
+    const hasVideoFile = !!videoFile;
+
+    if (!editingVideo && !hasDriveLink && !hasVideoFile) {
+      alert("Upload a video file or paste a Google Drive link.");
+      return;
+    }
+
     setUploading(true);
     try {
       const payload: Partial<Video> = { ...form };
+
+      if (videoFile) {
+        if (!driveConfigured) {
+          throw new Error("Google Drive upload is not configured on the server.");
+        }
+        setUploadPhase("Uploading video to Google Drive...");
+        setUploadProgress(0);
+        const { url } = await api.drive.uploadVideo(videoFile, setUploadProgress);
+        payload.googleDriveUrl = url;
+        setForm((prev) => ({ ...prev, googleDriveUrl: url }));
+      }
+
       if (thumbnailFile) {
+        setUploadPhase("Uploading thumbnail...");
         const { url } = await api.upload(thumbnailFile, "thumbnails");
         payload.thumbnailUrl = url;
       }
+
+      setUploadPhase("Saving video...");
       if (editingVideo) {
-        updateMutation.mutate({ id: editingVideo.id, data: payload });
+        await updateMutation.mutateAsync({ id: editingVideo.id, data: payload });
       } else {
-        createMutation.mutate(payload);
+        await createMutation.mutateAsync(payload);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Save failed");
     } finally {
       setUploading(false);
+      setUploadPhase("");
+      setUploadProgress(0);
     }
   };
 
@@ -272,16 +316,64 @@ export default function VideosPage() {
                 <Label>Description</Label>
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
+
+              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4">
+                <Label className="flex items-center gap-2">
+                  <Film className="h-4 w-4" /> Video File
+                </Label>
+                <Input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.webm,.mov,.avi,.mkv"
+                  disabled={uploading || !driveConfigured}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setVideoFile(file);
+                    if (file) setUploadProgress(0);
+                  }}
+                />
+                {videoFile && (
+                  <p className="text-xs text-gray-400">
+                    Selected: {videoFile.name} ({formatBytes(videoFile.size)})
+                  </p>
+                )}
+                {uploading && uploadPhase.startsWith("Uploading video") && (
+                  <div className="space-y-1">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-blue-400">{uploadProgress}% — {uploadPhase}</p>
+                  </div>
+                )}
+                {driveConfigured ? (
+                  <p className="text-xs text-green-400/80 flex items-center gap-1">
+                    <Upload className="h-3 w-3" /> Uploads go directly to Google Drive (not Vercel/Supabase).
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-400">
+                    Google Drive upload not configured — paste a share link below, or add env vars (see docs).
+                    {driveStatus?.serviceAccountEmail && (
+                      <> Share your Drive folder with: {driveStatus.serviceAccountEmail}</>
+                    )}
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
-                <Label>Google Drive Video Link</Label>
+                <Label>Google Drive Video Link (optional if uploading file)</Label>
                 <Input
                   value={form.googleDriveUrl}
                   onChange={(e) => setForm({ ...form, googleDriveUrl: e.target.value })}
                   placeholder="https://drive.google.com/file/d/FILE_ID/view"
-                  required={!editingVideo}
+                  disabled={!!videoFile && !editingVideo}
                 />
-                <p className="text-xs text-gray-500">Paste a public Google Drive share link. Video files are not uploaded to our servers.</p>
+                <p className="text-xs text-gray-500">
+                  Upload a file above, or paste an existing Google Drive share link.
+                </p>
               </div>
+
               <div className="space-y-2">
                 <Label>Thumbnail Upload</Label>
                 <Input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
@@ -318,7 +410,11 @@ export default function VideosPage() {
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploading}>
-                {uploading ? "Saving..." : editingVideo ? "Update Video" : "Save Video"}
+                {uploading
+                  ? uploadPhase || "Saving..."
+                  : editingVideo
+                    ? "Update Video"
+                    : "Save Video"}
               </Button>
             </form>
           </DialogContent>

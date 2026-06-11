@@ -134,4 +134,49 @@ export const api = {
     if (!res.ok) throw new Error(data.error || "Upload failed");
     return data as { success: boolean; url: string };
   },
+  drive: {
+    status: () =>
+      fetchApi<{
+        success: boolean;
+        configured: boolean;
+        serviceAccountEmail: string | null;
+        maxBytes: number;
+      }>("/drive/upload/session"),
+    uploadVideo: async (
+      file: File,
+      onProgress?: (percent: number) => void
+    ): Promise<{ url: string; fileId: string }> => {
+      const { uploadVideoToDriveResumable } = await import("@/lib/drive-upload");
+
+      const sessionRes = await fetch("/api/drive/upload/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileSize: file.size,
+        }),
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok) {
+        throw new Error(sessionData.error || "Failed to start Google Drive upload");
+      }
+
+      const fileId = await uploadVideoToDriveResumable(sessionData.uploadUrl, file, (p) =>
+        onProgress?.(p.percent)
+      );
+
+      const finalizeRes = await fetch("/api/drive/upload/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileId }),
+      });
+      const finalizeData = await finalizeRes.json();
+      if (!finalizeRes.ok) {
+        throw new Error(finalizeData.error || "Failed to finalize Google Drive upload");
+      }
+
+      return { url: finalizeData.url, fileId: finalizeData.fileId };
+    },
+  },
 };
