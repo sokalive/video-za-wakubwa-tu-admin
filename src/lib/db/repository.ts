@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { normalizeGoogleDriveUrl, isValidGoogleDriveUrl } from "@/lib/google-drive";
 import { getSupabaseAdmin, STORAGE_BUCKET } from "./client";
+import { supabaseRest } from "./rest";
 import {
   mapAdmin,
   mapVideo,
@@ -35,10 +36,12 @@ import type {
 // ─── Auth ───────────────────────────────────────────────────
 
 export async function findAdminByEmail(email: string): Promise<(Admin & { passwordHash: string }) | null> {
-  const db = getSupabaseAdmin();
-  const { data, error } = await db.from("admins").select("*").eq("email", email.toLowerCase()).single();
-  if (error || !data) return null;
-  return { ...mapAdmin(data), passwordHash: data.password_hash };
+  const { data, error } = await supabaseRest<Record<string, unknown>[]>(
+    `admins?select=*&email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`
+  );
+  const row = data?.[0];
+  if (error || !row) return null;
+  return { ...mapAdmin(row), passwordHash: row.password_hash as string };
 }
 
 export async function verifyAdminPassword(email: string, password: string): Promise<Admin | null> {
@@ -46,8 +49,10 @@ export async function verifyAdminPassword(email: string, password: string): Prom
   if (!admin) return null;
   const valid = await bcrypt.compare(password, admin.passwordHash);
   if (!valid) return null;
-  const db = getSupabaseAdmin();
-  await db.from("admins").update({ last_login: new Date().toISOString() }).eq("id", admin.id);
+  await supabaseRest(`admins?id=eq.${admin.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ last_login: new Date().toISOString() }),
+  });
   return { id: admin.id, name: admin.name, email: admin.email, role: admin.role, createdAt: admin.createdAt };
 }
 

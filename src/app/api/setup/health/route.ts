@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseConfig, isValidSupabaseUrl } from "@/lib/env";
-import { getSupabaseAdmin, isDbConfigured } from "@/lib/db/client";
+import { isDbConfigured } from "@/lib/db/client";
+import { supabaseRest } from "@/lib/db/rest";
 
 export async function GET() {
   const { url, serviceRoleKey } = getSupabaseConfig();
@@ -17,8 +18,10 @@ export async function GET() {
     supabaseUrlValid: isValidSupabaseUrl(url),
     supabaseHost: hostname,
     serviceRoleKeySet: !!serviceRoleKey,
+    serviceRoleKeyLength: serviceRoleKey.length,
     adminCount: null as number | null,
     queryError: null as string | null,
+    rawFetchStatus: null as number | null,
   };
 
   if (!status.dbConfigured) {
@@ -30,10 +33,10 @@ export async function GET() {
   }
 
   try {
-    const db = getSupabaseAdmin();
-    const { data, error } = await db.from("admins").select("id");
+    const { data, error, status: httpStatus } = await supabaseRest<{ id: string }[]>("admins?select=id");
+    status.rawFetchStatus = httpStatus;
     if (error) {
-      status.queryError = error.message;
+      status.queryError = error;
     } else {
       status.adminCount = data?.length ?? 0;
     }
@@ -47,6 +50,8 @@ export async function GET() {
     hint:
       status.adminCount === 0
         ? "No admin found. POST /api/setup/seed-admin or run supabase/seed-admin.sql in Supabase SQL Editor."
-        : undefined,
+        : status.serviceRoleKeyLength < 100
+          ? "SUPABASE_SERVICE_ROLE_KEY looks too short. Copy the service_role secret from Supabase → Settings → API."
+          : undefined,
   });
 }

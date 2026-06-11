@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { getSupabaseAdmin, isDbConfigured } from "@/lib/db/client";
+import { sanitizeEnv } from "@/lib/env";
+import { isDbConfigured } from "@/lib/db/client";
+import { supabaseRest } from "@/lib/db/rest";
 
 const DEFAULT_EMAIL = "waziriissa37@gmail.com";
 const DEFAULT_PASSWORD = "Isamu2025";
@@ -14,12 +16,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const db = getSupabaseAdmin();
-  const { data: admins, error: listError } = await db.from("admins").select("id, email");
+  const { data: admins, error: listError } = await supabaseRest<{ id: string; email: string }[]>(
+    "admins?select=id,email"
+  );
 
   if (listError) {
     return NextResponse.json(
-      { success: false, error: `Failed to query admins: ${listError.message}` },
+      { success: false, error: `Failed to query admins: ${listError}` },
       { status: 500 }
     );
   }
@@ -27,7 +30,7 @@ export async function POST(request: Request) {
   const setupToken = request.headers.get("x-setup-token");
   const hasAdmins = (admins?.length ?? 0) > 0;
 
-  if (hasAdmins && setupToken !== process.env.JWT_SECRET) {
+  if (hasAdmins && setupToken !== sanitizeEnv(process.env.JWT_SECRET)) {
     return NextResponse.json(
       { success: false, error: "Admin already exists. Provide x-setup-token header to reset." },
       { status: 403 }
@@ -45,32 +48,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "bcrypt verification failed" }, { status: 500 });
   }
 
-  const { error: upsertError } = await db.from("admins").upsert(
-    { email, name, password_hash: passwordHash, role: "super_admin" },
-    { onConflict: "email" }
-  );
+  const { data: created, error: upsertError, status } = await supabaseRest<
+    { id: string; email: string; role: string; password_hash: string }[]
+  >("admins?on_conflict=email", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({
+      email,
+      name,
+      password_hash: passwordHash,
+      role: "super_admin",
+    }),
+  });
 
   if (upsertError) {
     return NextResponse.json(
-      { success: false, error: `Failed to seed admin: ${upsertError.message}` },
+      { success: false, error: `Failed to seed admin (HTTP ${status}): ${upsertError}` },
       { status: 500 }
     );
   }
 
-  const { data: created, error: verifyError } = await db
-    .from("admins")
-    .select("id, email, password_hash, role")
-    .eq("email", email)
-    .single();
-
-  if (verifyError || !created) {
-    return NextResponse.json(
-      { success: false, error: verifyError?.message || "Admin not found after upsert" },
-      { status: 500 }
-    );
+  const row = created?.[0];
+  if (!row) {
+    return NextResponse.json({ success: false, error: "Admin not returned after upsert" }, { status: 500 });
   }
 
-  const loginWorks = await bcrypt.compare(password, created.password_hash);
+  const loginWorks = await bcrypt.compare(password, row.password_hash);
   if (!loginWorks) {
     return NextResponse.json(
       { success: false, error: "Stored password hash does not match" },
@@ -81,6 +84,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     message: hasAdmins ? "Admin password reset" : "Admin account created",
-    admin: { email: created.email, role: created.role },
+    admin: { email: row.email, role: row.role },
   });
 }
