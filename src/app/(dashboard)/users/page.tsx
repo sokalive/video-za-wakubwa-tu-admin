@@ -32,8 +32,7 @@ export default function UsersPage() {
   });
 
   const users = data?.data || [];
-  const vipCount = users.filter((u) => u.isVip).length;
-  const activeCount = users.filter((u) => u.isActive).length;
+  const stats = data?.stats ?? { total: users.length, vip: 0, active: 0 };
 
   return (
     <DashboardShell title="Users">
@@ -41,15 +40,15 @@ export default function UsersPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Card><CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-blue-600/20 flex items-center justify-center"><Search className="h-5 w-5 text-blue-400" /></div>
-            <div><p className="text-sm text-gray-400">Total Users</p><p className="text-xl font-bold text-white">{users.length}</p></div>
+            <div><p className="text-sm text-gray-400">Total Users</p><p className="text-xl font-bold text-white">{stats.total}</p></div>
           </CardContent></Card>
           <Card><CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-yellow-600/20 flex items-center justify-center"><Crown className="h-5 w-5 text-yellow-400" /></div>
-            <div><p className="text-sm text-gray-400">VIP Users</p><p className="text-xl font-bold text-white">{vipCount}</p></div>
+            <div><p className="text-sm text-gray-400">VIP Users</p><p className="text-xl font-bold text-white">{stats.vip}</p></div>
           </CardContent></Card>
           <Card><CardContent className="p-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-green-600/20 flex items-center justify-center"><UserCheck className="h-5 w-5 text-green-400" /></div>
-            <div><p className="text-sm text-gray-400">Active Users</p><p className="text-xl font-bold text-white">{activeCount}</p></div>
+            <div><p className="text-sm text-gray-400">Active Users</p><p className="text-xl font-bold text-white">{stats.active}</p></div>
           </CardContent></Card>
         </div>
 

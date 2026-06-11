@@ -223,42 +223,80 @@ export async function computeDashboardStats(db: ReturnType<typeof import("./clie
 }
 
 export async function computeAnalytics(db: ReturnType<typeof import("./client").getSupabaseAdmin>): Promise<AnalyticsData> {
-  const { data: videos } = await db.from("videos").select("*").order("views", { ascending: false }).limit(5);
-  const { data: categories } = await db.from("categories").select("*").limit(5);
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
-  const dailyViews = Array.from({ length: 30 }, (_, i) => ({
-    date: new Date(Date.now() - (29 - i) * 86400000).toISOString().split("T")[0],
-    views: Math.floor(Math.random() * 50000) + 30000,
+  const [videosRes, categoriesRes, paymentsRes] = await Promise.all([
+    db.from("videos").select("id, title, views, category_id, created_at").order("views", { ascending: false }),
+    db.from("categories").select("id, name"),
+    db
+      .from("payments")
+      .select("amount, status, created_at")
+      .eq("status", "completed")
+      .gte("created_at", thirtyDaysAgo.toISOString()),
+  ]);
+
+  const videos = videosRes.data ?? [];
+  const categories = categoriesRes.data ?? [];
+  const payments = paymentsRes.data ?? [];
+
+  const dailyViews = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (29 - i));
+    return { date: d.toISOString().split("T")[0], views: 0 };
+  });
+
+  const revenueByDate = new Map<string, number>();
+  for (const payment of payments) {
+    const date = String(payment.created_at).split("T")[0];
+    revenueByDate.set(date, (revenueByDate.get(date) ?? 0) + (payment.amount ?? 0));
+  }
+
+  const revenueChart = dailyViews.map(({ date }) => ({
+    date,
+    revenue: revenueByDate.get(date) ?? 0,
   }));
 
-  const monthlyViews = [
-    { month: "Jan", views: 820000 }, { month: "Feb", views: 910000 },
-    { month: "Mar", views: 1050000 }, { month: "Apr", views: 980000 },
-    { month: "May", views: 1120000 }, { month: "Jun", views: 890000 },
-  ];
+  const weeklyViews = Array.from({ length: 12 }, (_, i) => ({
+    week: `Week ${i + 1}`,
+    views: 0,
+  }));
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthlyViews = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return { month: monthNames[d.getMonth()], views: 0 };
+  });
+
+  const viewsByCategory = new Map<string, number>();
+  const countByCategory = new Map<string, number>();
+  for (const video of videos) {
+    const categoryId = video.category_id as string | null;
+    if (!categoryId) continue;
+    viewsByCategory.set(categoryId, (viewsByCategory.get(categoryId) ?? 0) + (video.views ?? 0));
+    countByCategory.set(categoryId, (countByCategory.get(categoryId) ?? 0) + 1);
+  }
 
   return {
     dailyViews,
-    weeklyViews: Array.from({ length: 12 }, (_, i) => ({
-      week: `Week ${i + 1}`,
-      views: Math.floor(Math.random() * 200000) + 150000,
-    })),
+    weeklyViews,
     monthlyViews,
-    revenueChart: dailyViews.map((d) => ({
-      date: d.date,
-      revenue: Math.floor(Math.random() * 2000000) + 500000,
+    revenueChart,
+    topVideos: videos.slice(0, 5).map((video) => ({
+      id: video.id as string,
+      title: video.title as string,
+      views: (video.views as number) ?? 0,
+      revenue: 0,
     })),
-    topVideos: (videos ?? []).map((v) => ({
-      id: v.id,
-      title: v.title,
-      views: v.views ?? 0,
-      revenue: Math.floor((v.views ?? 0) * 0.05),
-    })),
-    topCategories: (categories ?? []).map((c) => ({
-      id: c.id,
-      name: c.name,
-      views: Math.floor(Math.random() * 500000) + 100000,
-      videoCount: c.video_count ?? 0,
-    })),
+    topCategories: categories
+      .map((category) => ({
+        id: category.id as string,
+        name: category.name as string,
+        views: viewsByCategory.get(category.id as string) ?? 0,
+        videoCount: countByCategory.get(category.id as string) ?? 0,
+      }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5),
   };
 }

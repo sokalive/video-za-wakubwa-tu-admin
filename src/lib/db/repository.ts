@@ -90,6 +90,20 @@ export async function listActivityLogs(): Promise<ActivityLog[]> {
 
 // ─── Videos ─────────────────────────────────────────────────
 
+async function syncCategoryVideoCount(db: ReturnType<typeof getSupabaseAdmin>, categoryId: string): Promise<void> {
+  if (!categoryId) return;
+  const { count } = await db
+    .from("videos")
+    .select("*", { count: "exact", head: true })
+    .eq("category_id", categoryId);
+  await db.from("categories").update({ video_count: count ?? 0 }).eq("id", categoryId);
+}
+
+async function syncCategoryVideoCounts(db: ReturnType<typeof getSupabaseAdmin>, categoryIds: string[]): Promise<void> {
+  const uniqueIds = [...new Set(categoryIds.filter(Boolean))];
+  await Promise.all(uniqueIds.map((categoryId) => syncCategoryVideoCount(db, categoryId)));
+}
+
 export async function listVideos(filters?: { search?: string; category?: string; isVip?: boolean }): Promise<Video[]> {
   let query = getSupabaseAdmin().from("videos").select("*").order("created_at", { ascending: false });
   if (filters?.category) query = query.eq("category_id", filters.category);
@@ -141,12 +155,14 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
   };
   const { data, error } = await db.from("videos").insert(row).select().single();
   if (error) throw new Error(error.message);
+  if (body.categoryId) await syncCategoryVideoCount(db, body.categoryId);
   await logActivity(adminId, adminName, "upload", "video", `Uploaded video: ${body.title}`, id);
   return mapVideo(data);
 }
 
 export async function updateVideo(id: string, body: Partial<Video>): Promise<Video> {
   const db = getSupabaseAdmin();
+  const { data: existing } = await db.from("videos").select("category_id").eq("id", id).single();
   const updates = mapVideoToDb(body);
 
   if (body.googleDriveUrl !== undefined) {
@@ -161,22 +177,42 @@ export async function updateVideo(id: string, body: Partial<Video>): Promise<Vid
   }
   const { data, error } = await db.from("videos").update(updates).eq("id", id).select().single();
   if (error) throw new Error(error.message);
+  const categoryIds = [existing?.category_id as string, body.categoryId].filter(Boolean) as string[];
+  await syncCategoryVideoCounts(db, categoryIds);
   return mapVideo(data);
 }
 
 export async function deleteVideo(id: string, adminId: string, adminName: string): Promise<void> {
   const db = getSupabaseAdmin();
-  const { data: video } = await db.from("videos").select("title").eq("id", id).single();
+  const { data: video } = await db.from("videos").select("title, category_id").eq("id", id).single();
   const { error } = await db.from("videos").delete().eq("id", id);
   if (error) throw new Error(error.message);
+  if (video?.category_id) await syncCategoryVideoCount(db, video.category_id as string);
   await logActivity(adminId, adminName, "delete", "video", `Deleted video: ${video?.title ?? id}`, id);
 }
 
 // ─── Categories ─────────────────────────────────────────────
 
 export async function listCategories(): Promise<Category[]> {
-  const { data } = await getSupabaseAdmin().from("categories").select("*").order("name");
-  return (data ?? []).map(mapCategory);
+  const db = getSupabaseAdmin();
+  const [{ data: categories }, { data: videos }] = await Promise.all([
+    db.from("categories").select("*").order("name"),
+    db.from("videos").select("category_id"),
+  ]);
+
+  const counts = new Map<string, number>();
+  for (const video of videos ?? []) {
+    const categoryId = video.category_id as string | null;
+    if (!categoryId) continue;
+    counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1);
+  }
+
+  return (categories ?? []).map((row) =>
+    mapCategory({
+      ...row,
+      video_count: counts.get(row.id as string) ?? 0,
+    })
+  );
 }
 
 export async function createCategory(body: Partial<Category>): Promise<Category> {
@@ -242,6 +278,21 @@ export async function updateApk(body: Partial<ApkRelease>, adminId: string, admi
 }
 
 // ─── Users / Payments / Ads / Settings ──────────────────────
+
+export async function getUserStats(): Promise<{ total: number; vip: number; active: number }> {
+  const db = getSupabaseAdmin();
+  const [totalRes, vipRes, activeRes] = await Promise.all([
+    db.from("users").select("id", { count: "exact", head: true }),
+    db.from("users").select("id", { count: "exact", head: true }).eq("is_vip", true),
+    db.from("users").select("id", { count: "exact", head: true }).eq("is_active", true),
+  ]);
+
+  return {
+    total: totalRes.count ?? 0,
+    vip: vipRes.count ?? 0,
+    active: activeRes.count ?? 0,
+  };
+}
 
 export async function listUsers(filters?: { search?: string; isVip?: boolean; isActive?: boolean }): Promise<User[]> {
   let query = getSupabaseAdmin().from("users").select("*").order("joined_at", { ascending: false });

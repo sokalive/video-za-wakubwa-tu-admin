@@ -80,7 +80,7 @@ export const api = {
   users: {
     list: (params?: { search?: string; isVip?: string; isActive?: string }) => {
       const query = new URLSearchParams(params as Record<string, string>).toString();
-      return fetchApi<{ success: boolean; data: import("@/types").User[] }>(
+      return fetchApi<{ success: boolean; data: import("@/types").User[]; stats: { total: number; vip: number; active: number } }>(
         `/users${query ? `?${query}` : ""}`
       );
     },

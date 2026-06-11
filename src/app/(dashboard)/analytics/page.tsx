@@ -37,7 +37,7 @@ export default function AnalyticsPage() {
           </TabsList>
 
           <TabsContent value="daily" className="mt-6">
-            <ChartCard title="Daily Views (Last 30 Days)" data={analytics.dailyViews} dataKey="views" xKey="date" color="#6366f1" />
+            <ChartCard title="Daily Views (0 until view tracking is enabled)" data={analytics.dailyViews} dataKey="views" xKey="date" color="#6366f1" />
           </TabsContent>
 
           <TabsContent value="weekly" className="mt-6">
