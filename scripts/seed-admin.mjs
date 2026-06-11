@@ -14,7 +14,7 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = join(__dirname, "..", ".env.local");
 
-if (existsSync(envPath)) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL && existsSync(envPath)) {
   for (const line of readFileSync(envPath, "utf8").split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;

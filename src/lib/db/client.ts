@@ -1,20 +1,26 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseConfig, isValidSupabaseUrl } from "@/lib/env";
 
 let adminClient: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient {
   if (adminClient) return adminClient;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, serviceRoleKey } = getSupabaseConfig();
 
-  if (!url || !key) {
+  if (!url || !serviceRoleKey) {
     throw new Error(
       "Missing Supabase credentials. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
     );
   }
 
-  adminClient = createClient(url, key, {
+  if (!isValidSupabaseUrl(url)) {
+    throw new Error(
+      "Invalid NEXT_PUBLIC_SUPABASE_URL. Use your Project URL from Supabase → Settings → API (https://xxxxx.supabase.co)."
+    );
+  }
+
+  adminClient = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -22,7 +28,8 @@ export function getSupabaseAdmin(): SupabaseClient {
 }
 
 export function isDbConfigured(): boolean {
-  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const { url, serviceRoleKey } = getSupabaseConfig();
+  return !!(url && serviceRoleKey && isValidSupabaseUrl(url));
 }
 
 export const STORAGE_BUCKET = "media";
