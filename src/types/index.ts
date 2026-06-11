@@ -15,8 +15,7 @@ export interface Video {
   categoryId: string;
   categoryName: string;
   thumbnailUrl: string;
-  videoUrl: string;
-  trailerUrl?: string;
+  googleDriveUrl: string;
   duration: string;
   resolution: string;
   isVip: boolean;
@@ -113,10 +112,8 @@ export interface DashboardStats {
   totalVideos: number;
   totalVipVideos: number;
   totalFreeVideos: number;
+  totalCategories: number;
   totalUsers: number;
-  totalVipUsers: number;
-  totalRevenue: number;
-  totalApkDownloads: number;
   totalViews: number;
 }
 

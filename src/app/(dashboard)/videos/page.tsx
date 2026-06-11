@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,13 @@ import { formatNumber } from "@/lib/utils";
 import type { Video } from "@/types";
 
 const emptyVideo = {
-  title: "", description: "", categoryId: "", duration: "", resolution: "1080p",
-  isVip: false, isFeatured: false, tags: [] as string[],
+  title: "",
+  description: "",
+  categoryId: "",
+  googleDriveUrl: "",
+  isVip: false,
+  isFeatured: false,
+  tags: [] as string[],
 };
 
 export default function VideosPage() {
@@ -40,8 +45,6 @@ export default function VideosPage() {
   const [form, setForm] = useState(emptyVideo);
   const [tagInput, setTagInput] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [trailerFile, setTrailerFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -61,8 +64,9 @@ export default function VideosPage() {
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["videos"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setDialogOpen(false);
-      setForm(emptyVideo);
+      resetForm();
     },
   });
 
@@ -73,18 +77,27 @@ export default function VideosPage() {
       queryClient.invalidateQueries({ queryKey: ["videos"] });
       setDialogOpen(false);
       setEditingVideo(null);
-      setForm(emptyVideo);
+      resetForm();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.videos.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["videos"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
+
+  const resetForm = () => {
+    setForm(emptyVideo);
+    setTagInput("");
+    setThumbnailFile(null);
+  };
 
   const openCreate = () => {
     setEditingVideo(null);
-    setForm(emptyVideo);
+    resetForm();
     setDialogOpen(true);
   };
 
@@ -94,8 +107,7 @@ export default function VideosPage() {
       title: video.title,
       description: video.description,
       categoryId: video.categoryId,
-      duration: video.duration,
-      resolution: video.resolution,
+      googleDriveUrl: video.googleDriveUrl,
       isVip: video.isVip,
       isFeatured: video.isFeatured,
       tags: video.tags,
@@ -112,21 +124,13 @@ export default function VideosPage() {
         const { url } = await api.upload(thumbnailFile, "thumbnails");
         payload.thumbnailUrl = url;
       }
-      if (videoFile) {
-        const { url } = await api.upload(videoFile, "videos");
-        payload.videoUrl = url;
-      }
-      if (trailerFile) {
-        const { url } = await api.upload(trailerFile, "videos");
-        payload.trailerUrl = url;
-      }
       if (editingVideo) {
         updateMutation.mutate({ id: editingVideo.id, data: payload });
       } else {
         createMutation.mutate(payload);
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
+      alert(err instanceof Error ? err.message : "Save failed");
     } finally {
       setUploading(false);
     }
@@ -168,7 +172,7 @@ export default function VideosPage() {
             </Select>
           </div>
           <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Upload Video
+            <Plus className="h-4 w-4" /> Add Video
           </Button>
         </div>
 
@@ -186,7 +190,7 @@ export default function VideosPage() {
                   <TableRow>
                     <TableHead>Video</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Duration</TableHead>
+                    <TableHead>Drive Link</TableHead>
                     <TableHead>Views</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -197,21 +201,31 @@ export default function VideosPage() {
                     <TableRow key={video.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Image
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            width={80}
-                            height={45}
-                            className="rounded-lg object-cover"
-                          />
+                          {video.thumbnailUrl ? (
+                            <Image
+                              src={video.thumbnailUrl}
+                              alt={video.title}
+                              width={80}
+                              height={45}
+                              className="rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="h-[45px] w-[80px] rounded-lg bg-white/10" />
+                          )}
                           <div>
                             <p className="font-medium text-white">{video.title}</p>
-                            <p className="text-xs text-gray-500">{video.resolution}</p>
+                            <p className="text-xs text-gray-500 line-clamp-1">{video.description}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>{video.categoryName}</TableCell>
-                      <TableCell>{video.duration}</TableCell>
+                      <TableCell>
+                        {video.googleDriveUrl ? (
+                          <a href={video.googleDriveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:underline">
+                            <ExternalLink className="h-3 w-3" /> Drive
+                          </a>
+                        ) : "—"}
+                      </TableCell>
                       <TableCell>{formatNumber(video.views)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -247,16 +261,30 @@ export default function VideosPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editingVideo ? "Edit Video" : "Upload Video"}</DialogTitle>
+              <DialogTitle>{editingVideo ? "Edit Video" : "Add Video"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label>Title</Label>
+                <Label>Video Title</Label>
                 <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Google Drive Video Link</Label>
+                <Input
+                  value={form.googleDriveUrl}
+                  onChange={(e) => setForm({ ...form, googleDriveUrl: e.target.value })}
+                  placeholder="https://drive.google.com/file/d/FILE_ID/view"
+                  required={!editingVideo}
+                />
+                <p className="text-xs text-gray-500">Paste a public Google Drive share link. Video files are not uploaded to our servers.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Thumbnail Upload</Label>
+                <Input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
@@ -268,35 +296,6 @@ export default function VideosPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Duration</Label>
-                  <Input value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} placeholder="1:30:00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Resolution</Label>
-                  <Select value={form.resolution} onValueChange={(v) => setForm({ ...form, resolution: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="720p">720p</SelectItem>
-                      <SelectItem value="1080p">1080p</SelectItem>
-                      <SelectItem value="4K">4K</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Thumbnail Upload</Label>
-                <Input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Video Upload</Label>
-                <Input type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Trailer Upload</Label>
-                <Input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Tags</Label>
@@ -319,7 +318,7 @@ export default function VideosPage() {
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploading}>
-                {uploading ? "Uploading files..." : editingVideo ? "Update Video" : "Upload Video"}
+                {uploading ? "Saving..." : editingVideo ? "Update Video" : "Save Video"}
               </Button>
             </form>
           </DialogContent>

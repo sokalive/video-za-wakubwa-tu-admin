@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { normalizeGoogleDriveUrl, isValidGoogleDriveUrl } from "@/lib/google-drive";
 import { getSupabaseAdmin, STORAGE_BUCKET } from "./client";
 import {
   mapAdmin,
@@ -109,6 +110,13 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     const { data: cat } = await db.from("categories").select("name").eq("id", body.categoryId).single();
     categoryName = cat?.name ?? categoryName;
   }
+
+  const driveInput = body.googleDriveUrl ?? "";
+  if (!isValidGoogleDriveUrl(driveInput)) {
+    throw new Error("Invalid Google Drive link. Use a share link like https://drive.google.com/file/d/FILE_ID/view");
+  }
+  const googleDriveUrl = normalizeGoogleDriveUrl(driveInput)!;
+
   const id = `vid-${Date.now()}`;
   const row = {
     id,
@@ -117,8 +125,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     category_id: body.categoryId,
     category_name: categoryName,
     thumbnail_url: body.thumbnailUrl ?? "",
-    video_url: body.videoUrl ?? "",
-    trailer_url: body.trailerUrl,
+    google_drive_url: googleDriveUrl,
     duration: body.duration ?? "0:00",
     resolution: body.resolution ?? "1080p",
     is_vip: body.isVip ?? false,
@@ -136,6 +143,13 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
 export async function updateVideo(id: string, body: Partial<Video>): Promise<Video> {
   const db = getSupabaseAdmin();
   const updates = mapVideoToDb(body);
+
+  if (body.googleDriveUrl !== undefined) {
+    if (!isValidGoogleDriveUrl(body.googleDriveUrl)) {
+      throw new Error("Invalid Google Drive link");
+    }
+    updates.google_drive_url = normalizeGoogleDriveUrl(body.googleDriveUrl);
+  }
   if (body.categoryId) {
     const { data: cat } = await db.from("categories").select("name").eq("id", body.categoryId).single();
     if (cat) updates.category_name = cat.name;
@@ -308,7 +322,7 @@ export { computeDashboardStats, computeAnalytics };
 
 export async function uploadFile(
   file: File,
-  folder: "thumbnails" | "videos" | "apk" | "screenshots"
+  folder: "thumbnails" | "apk" | "screenshots"
 ): Promise<string> {
   const db = getSupabaseAdmin();
   const ext = file.name.split(".").pop() ?? "bin";

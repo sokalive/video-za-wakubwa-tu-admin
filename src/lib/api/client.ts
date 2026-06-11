@@ -125,7 +125,7 @@ export const api = {
   activityLogs: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").ActivityLog[] }>("/activity-logs"),
   },
-  upload: async (file: File, folder: "thumbnails" | "videos" | "apk" | "screenshots") => {
+  upload: async (file: File, folder: "thumbnails" | "apk" | "screenshots") => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);

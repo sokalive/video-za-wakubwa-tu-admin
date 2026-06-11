@@ -23,8 +23,7 @@ export function mapVideo(row: Record<string, any>): Video {
     categoryId: row.category_id ?? "",
     categoryName: row.category_name ?? "",
     thumbnailUrl: row.thumbnail_url ?? "",
-    videoUrl: row.video_url ?? "",
-    trailerUrl: row.trailer_url ?? undefined,
+    googleDriveUrl: row.google_drive_url ?? row.video_url ?? "",
     duration: row.duration ?? "0:00",
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
@@ -43,8 +42,7 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.categoryId !== undefined) data.category_id = video.categoryId;
   if (video.categoryName !== undefined) data.category_name = video.categoryName;
   if (video.thumbnailUrl !== undefined) data.thumbnail_url = video.thumbnailUrl;
-  if (video.videoUrl !== undefined) data.video_url = video.videoUrl;
-  if (video.trailerUrl !== undefined) data.trailer_url = video.trailerUrl;
+  if (video.googleDriveUrl !== undefined) data.google_drive_url = video.googleDriveUrl;
   if (video.duration !== undefined) data.duration = video.duration;
   if (video.resolution !== undefined) data.resolution = video.resolution;
   if (video.isVip !== undefined) data.is_vip = video.isVip;
@@ -206,25 +204,20 @@ export function mapSettingsToDb(s: Partial<SiteSettings>): Record<string, unknow
 }
 
 export async function computeDashboardStats(db: ReturnType<typeof import("./client").getSupabaseAdmin>): Promise<DashboardStats> {
-  const [videos, users, payments, apk] = await Promise.all([
+  const [videos, users, categories] = await Promise.all([
     db.from("videos").select("is_vip, views"),
-    db.from("users").select("is_vip"),
-    db.from("payments").select("amount, status"),
-    db.from("apk_releases").select("download_count").eq("id", "current").single(),
+    db.from("users").select("id"),
+    db.from("categories").select("id"),
   ]);
 
   const vids = videos.data ?? [];
-  const usrs = users.data ?? [];
-  const pays = payments.data ?? [];
 
   return {
     totalVideos: vids.length,
     totalVipVideos: vids.filter((v) => v.is_vip).length,
     totalFreeVideos: vids.filter((v) => !v.is_vip).length,
-    totalUsers: usrs.length,
-    totalVipUsers: usrs.filter((u) => u.is_vip).length,
-    totalRevenue: pays.filter((p) => p.status === "completed").reduce((s, p) => s + p.amount, 0),
-    totalApkDownloads: apk.data?.download_count ?? 0,
+    totalCategories: categories.data?.length ?? 0,
+    totalUsers: users.data?.length ?? 0,
     totalViews: vids.reduce((s, v) => s + (v.views ?? 0), 0),
   };
 }

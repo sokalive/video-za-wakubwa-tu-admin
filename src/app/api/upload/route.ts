@@ -22,12 +22,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "No file provided" }, { status: 400 });
     }
 
-    const validFolders = ["thumbnails", "videos", "apk", "screenshots"];
+    const validFolders = ["thumbnails", "apk", "screenshots"];
     if (!validFolders.includes(folder)) {
-      return NextResponse.json({ success: false, error: "Invalid folder" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Invalid folder. Video files must use Google Drive links." }, { status: 400 });
     }
 
-    const url = await uploadFile(file, folder as "thumbnails" | "videos" | "apk" | "screenshots");
+    const url = await uploadFile(file, folder as "thumbnails" | "apk" | "screenshots");
     return NextResponse.json({ success: true, url });
   } catch (err) {
     return NextResponse.json(

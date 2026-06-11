@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS videos (
   category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
   category_name TEXT DEFAULT '',
   thumbnail_url TEXT NOT NULL DEFAULT '',
+  google_drive_url TEXT DEFAULT '',
   video_url TEXT DEFAULT '',
   trailer_url TEXT,
   duration TEXT DEFAULT '0:00',
@@ -188,4 +189,5 @@ CREATE POLICY "Public read settings" ON site_settings FOR SELECT USING (true);
 
 -- Storage buckets (run in Supabase Dashboard > Storage):
 -- Create bucket: media (public)
--- Folders: thumbnails/, videos/, apk/, screenshots/
+-- Folders: thumbnails/, apk/, screenshots/
+-- NOTE: Video files are stored on Google Drive, NOT in Supabase Storage.
