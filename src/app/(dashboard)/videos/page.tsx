@@ -71,6 +71,7 @@ export default function VideosPage() {
   });
 
   const driveConfigured = driveStatus?.configured ?? false;
+  const driveConfigReason = driveStatus?.reason ?? null;
 
   const createMutation = useMutation({
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
@@ -352,12 +353,15 @@ export default function VideosPage() {
                     <Upload className="h-3 w-3" /> Uploads go directly to Google Drive (not Vercel/Supabase).
                   </p>
                 ) : (
-                  <p className="text-xs text-amber-400">
-                    Google Drive upload not configured — paste a share link below, or add env vars (see docs).
-                    {driveStatus?.serviceAccountEmail && (
-                      <> Share your Drive folder with: {driveStatus.serviceAccountEmail}</>
+                  <div className="space-y-1 text-xs text-amber-400">
+                    <p>{driveConfigReason ?? "Google Drive upload not configured."}</p>
+                    {driveStatus?.jsonParseOk && driveStatus?.clientEmail && !driveStatus?.folderIdSet && (
+                      <p>Service account OK: {driveStatus.clientEmail}. Add GOOGLE_DRIVE_FOLDER_ID and redeploy.</p>
                     )}
-                  </p>
+                    {driveStatus?.serviceAccountJsonSet && !driveStatus?.jsonParseOk && (
+                      <p>JSON env var is set but failed to parse. Use single-line minified JSON or GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64.</p>
+                    )}
+                  </div>
                 )}
               </div>
 

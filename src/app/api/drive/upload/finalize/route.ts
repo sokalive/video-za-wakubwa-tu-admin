@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { finalizeDriveUpload, isGoogleDriveUploadConfigured } from "@/lib/google-drive-client";
+import { finalizeDriveUpload, getDriveConfigStatus } from "@/lib/google-drive-client";
 import { isValidGoogleDriveUrl } from "@/lib/google-drive";
 
 export async function POST(request: Request) {
@@ -9,9 +9,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isGoogleDriveUploadConfigured()) {
+  const driveStatus = getDriveConfigStatus();
+  if (!driveStatus.configured) {
     return NextResponse.json(
-      { success: false, error: "Google Drive upload is not configured." },
+      { success: false, error: driveStatus.reason ?? "Google Drive upload is not configured." },
       { status: 503 }
     );
   }

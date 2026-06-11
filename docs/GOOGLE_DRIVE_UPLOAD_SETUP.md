@@ -58,10 +58,12 @@ vzw-video-uploader@your-project.iam.gserviceaccount.com
 
 Add these to the **admin** Vercel project (`video-za-wakubwa-tu-admin`):
 
-| Variable | Value |
-|----------|-------|
-| `GOOGLE_DRIVE_FOLDER_ID` | Folder ID from Step 3 |
-| `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` | Entire JSON key file as one line |
+| Variable | Required | Value |
+|----------|----------|-------|
+| `GOOGLE_DRIVE_FOLDER_ID` | **Yes** | Folder ID from Step 3 (uploads fail without this) |
+| `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` | **Yes** | Entire JSON key file as one line |
+
+**Both variables are required.** Setting only the service account JSON is not enough — the panel checks for `GOOGLE_DRIVE_FOLDER_ID` at runtime.
 
 ### Formatting the JSON for Vercel
 
@@ -117,7 +119,9 @@ GET /api/drive/upload/session
 
 | Error | Fix |
 |-------|-----|
-| `Google Drive upload is not configured` | Add both env vars on Vercel and redeploy |
+| `Google Drive upload is not configured` | Check GET `/api/drive/upload/session` while logged in — response includes `reason`, `folderIdSet`, `jsonParseOk` |
+| `GOOGLE_DRIVE_FOLDER_ID is not set` | Add folder ID from Drive URL to Vercel **and redeploy** |
+| `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is set but invalid JSON` | Use minified single-line JSON, or `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64`, or split `GOOGLE_DRIVE_CLIENT_EMAIL` + `GOOGLE_DRIVE_PRIVATE_KEY` |
 | `Insufficient permissions` | Share Drive folder with service account email as **Editor** |
 | `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
 | Upload fails at 0% (CORS) | Ensure Drive API is enabled; try different browser |

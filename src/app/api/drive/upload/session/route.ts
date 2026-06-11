@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import {
   createResumableUploadSession,
-  isGoogleDriveUploadConfigured,
+  getDriveConfigStatus,
   isAllowedVideoFile,
   MAX_VIDEO_BYTES,
-  getServiceAccountEmail,
 } from "@/lib/google-drive-client";
 
 export async function POST(request: Request) {
@@ -14,12 +13,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isGoogleDriveUploadConfigured()) {
+  const driveStatus = getDriveConfigStatus();
+
+  if (!driveStatus.configured) {
     return NextResponse.json(
       {
         success: false,
-        error: "Google Drive upload is not configured. Set GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_FOLDER_ID on Vercel.",
-        serviceAccountEmail: getServiceAccountEmail(),
+        error: driveStatus.reason ?? "Google Drive upload is not configured.",
+        ...driveStatus,
       },
       { status: 503 }
     );
@@ -75,10 +76,11 @@ export async function GET() {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const driveStatus = getDriveConfigStatus();
+
   return NextResponse.json({
     success: true,
-    configured: isGoogleDriveUploadConfigured(),
-    serviceAccountEmail: getServiceAccountEmail(),
+    ...driveStatus,
     maxBytes: MAX_VIDEO_BYTES,
   });
 }

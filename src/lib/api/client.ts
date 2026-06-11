@@ -139,7 +139,12 @@ export const api = {
       fetchApi<{
         success: boolean;
         configured: boolean;
-        serviceAccountEmail: string | null;
+        serviceAccountJsonSet: boolean;
+        folderIdSet: boolean;
+        jsonParseOk: boolean;
+        clientEmail: string | null;
+        folderId: string | null;
+        reason: string | null;
         maxBytes: number;
       }>("/drive/upload/session"),
     uploadVideo: async (

@@ -52,18 +52,19 @@ async function main() {
 
   console.log("\n1b. Google Drive Upload");
   const driveJson = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON;
-  const driveFolder = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!driveJson) warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "not set — video file upload disabled (paste links only)");
-  else pass("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON");
-  if (!driveFolder) warn("GOOGLE_DRIVE_FOLDER_ID", "not set — video file upload disabled");
-  else pass("GOOGLE_DRIVE_FOLDER_ID");
-  if (driveJson && driveFolder) {
+  const driveB64 = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64;
+  const driveFolder = process.env.GOOGLE_DRIVE_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_URL;
+  if (!driveJson && !driveB64 && !(process.env.GOOGLE_DRIVE_CLIENT_EMAIL && process.env.GOOGLE_DRIVE_PRIVATE_KEY)) {
+    warn("GOOGLE_DRIVE credentials", "not set — video file upload disabled (paste links only)");
+  } else pass("GOOGLE_DRIVE credentials env present");
+  if (!driveFolder) fail("GOOGLE_DRIVE_FOLDER_ID", "not set — required for uploads (add folder ID from Drive URL)");
+  else pass(`GOOGLE_DRIVE_FOLDER_ID (${driveFolder.slice(0, 12)}...)`);
+  if (driveJson) {
     try {
-      const sa = JSON.parse(driveJson);
-      if (sa.client_email) pass(`Drive service account (${sa.client_email})`);
-      else warn("Drive service account", "JSON missing client_email");
+      JSON.parse(driveJson.trim().replace(/^["']|["']$/g, ""));
+      pass("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON parses as JSON");
     } catch {
-      warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "invalid JSON");
+      warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "invalid JSON — use minified single line or BASE64 variant");
     }
   }
 
