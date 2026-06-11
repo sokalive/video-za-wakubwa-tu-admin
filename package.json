@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node scripts/seed.mjs",
-    "seed:test-video": "node scripts/seed-test-video.mjs"
+    "seed:test-video": "node scripts/seed-test-video.mjs",
+    "verify": "node scripts/verify-production.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.12",
