@@ -125,4 +125,13 @@ export const api = {
   activityLogs: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").ActivityLog[] }>("/activity-logs"),
   },
+  upload: async (file: File, folder: "thumbnails" | "videos" | "apk" | "screenshots") => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", folder);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    return data as { success: boolean; url: string };
+  },
 };

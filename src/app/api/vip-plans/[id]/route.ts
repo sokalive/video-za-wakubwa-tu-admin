@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
+import { updateVipPlan } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const body = await request.json();
-  const index = mockStore.vipPlans.findIndex((p) => p.id === id);
-
-  if (index === -1) {
-    return NextResponse.json({ success: false, error: "Plan not found" }, { status: 404 });
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const data = await updateVipPlan(id, body);
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
   }
-
-  mockStore.vipPlans[index] = { ...mockStore.vipPlans[index], ...body };
-  return NextResponse.json({ success: true, data: mockStore.vipPlans[index] });
 }

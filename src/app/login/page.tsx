@@ -64,7 +64,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@vzwakubwa.com"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -95,10 +95,6 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
-
-            <p className="text-center text-xs text-gray-500">
-              Demo: admin@vzwakubwa.com / admin123
-            </p>
           </form>
         </CardContent>
       </Card>

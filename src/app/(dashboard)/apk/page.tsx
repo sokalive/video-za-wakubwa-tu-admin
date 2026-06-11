@@ -19,6 +19,9 @@ import { formatNumber, formatDate } from "@/lib/utils";
 export default function ApkPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ version: "", releaseNotes: "", forceUpdate: false });
+  const [apkFile, setApkFile] = useState<File | null>(null);
+  const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["apk"],
@@ -93,15 +96,34 @@ export default function ApkPage() {
           </CardHeader>
           <CardContent>
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                updateMutation.mutate(form);
+                setUploading(true);
+                try {
+                  const payload: Record<string, unknown> = { ...form };
+                  if (apkFile) {
+                    const { url } = await api.upload(apkFile, "apk");
+                    payload.fileUrl = url;
+                    payload.fileSize = `${(apkFile.size / (1024 * 1024)).toFixed(1)} MB`;
+                  }
+                  if (screenshotFiles.length) {
+                    const urls = await Promise.all(
+                      screenshotFiles.map((f) => api.upload(f, "screenshots").then((r) => r.url))
+                    );
+                    payload.screenshots = urls;
+                  }
+                  updateMutation.mutate(payload);
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : "Upload failed");
+                } finally {
+                  setUploading(false);
+                }
               }}
               className="space-y-4"
             >
               <div className="space-y-2">
                 <Label>APK File</Label>
-                <Input type="file" accept=".apk" />
+                <Input type="file" accept=".apk" onChange={(e) => setApkFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Version</Label>
@@ -121,7 +143,7 @@ export default function ApkPage() {
               </div>
               <div className="space-y-2">
                 <Label>App Screenshots</Label>
-                <Input type="file" accept="image/*" multiple />
+                <Input type="file" accept="image/*" multiple onChange={(e) => setScreenshotFiles(Array.from(e.target.files ?? []))} />
               </div>
               <div className="flex items-center justify-between">
                 <Label>Force Update</Label>
@@ -130,8 +152,8 @@ export default function ApkPage() {
                   onCheckedChange={(v) => setForm({ ...form, forceUpdate: v })}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Uploading..." : "Upload APK"}
+              <Button type="submit" className="w-full" disabled={updateMutation.isPending || uploading}>
+                {uploading ? "Uploading..." : updateMutation.isPending ? "Saving..." : "Upload APK"}
               </Button>
             </form>
           </CardContent>

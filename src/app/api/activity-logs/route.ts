@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
+import { listActivityLogs } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET() {
-  return NextResponse.json({ success: true, data: mockStore.activityLogs });
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const data = await listActivityLogs();
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }

@@ -1,55 +1,40 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
+import { getSession } from "@/lib/auth/session";
+import { updateVideo, deleteVideo } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const body = await request.json();
-  const index = mockStore.videos.findIndex((v) => v.id === id);
-
-  if (index === -1) {
-    return NextResponse.json({ success: false, error: "Video not found" }, { status: 404 });
+  if (!isDbConfigured()) {
+    return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
   }
-
-  const category = body.categoryId
-    ? mockStore.categories.find((c) => c.id === body.categoryId)
-    : null;
-
-  mockStore.videos[index] = {
-    ...mockStore.videos[index],
-    ...body,
-    categoryName: category?.name || mockStore.videos[index].categoryName,
-    updatedAt: new Date().toISOString(),
-  };
-
-  return NextResponse.json({ success: true, data: mockStore.videos[index] });
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const video = await updateVideo(id, body);
+    return NextResponse.json({ success: true, data: video });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const index = mockStore.videos.findIndex((v) => v.id === id);
-
-  if (index === -1) {
-    return NextResponse.json({ success: false, error: "Video not found" }, { status: 404 });
+  if (!isDbConfigured()) {
+    return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
   }
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-  const deleted = mockStore.videos.splice(index, 1)[0];
-  mockStore.activityLogs.unshift({
-    id: `log-${Date.now()}`,
-    adminId: "admin-1",
-    adminName: "Super Admin",
-    action: "delete",
-    entity: "video",
-    entityId: id,
-    details: `Deleted video: ${deleted.title}`,
-    ipAddress: "127.0.0.1",
-    createdAt: new Date().toISOString(),
-  });
-
-  return NextResponse.json({ success: true });
+    const { id } = await params;
+    await deleteVideo(id, session.adminId, session.name);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }

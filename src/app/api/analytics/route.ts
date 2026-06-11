@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
-import { MOCK_ANALYTICS } from "@/lib/mock-data";
+import { computeAnalytics } from "@/lib/db/repository";
+import { getSupabaseAdmin, isDbConfigured } from "@/lib/db/client";
 
 export async function GET() {
-  return NextResponse.json({ success: true, data: MOCK_ANALYTICS });
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const data = await computeAnalytics(getSupabaseAdmin());
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }

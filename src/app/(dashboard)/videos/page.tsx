@@ -39,6 +39,10 @@ export default function VideosPage() {
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [form, setForm] = useState(emptyVideo);
   const [tagInput, setTagInput] = useState("");
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [trailerFile, setTrailerFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -99,12 +103,32 @@ export default function VideosPage() {
     setDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingVideo) {
-      updateMutation.mutate({ id: editingVideo.id, data: form });
-    } else {
-      createMutation.mutate(form);
+    setUploading(true);
+    try {
+      const payload: Partial<Video> = { ...form };
+      if (thumbnailFile) {
+        const { url } = await api.upload(thumbnailFile, "thumbnails");
+        payload.thumbnailUrl = url;
+      }
+      if (videoFile) {
+        const { url } = await api.upload(videoFile, "videos");
+        payload.videoUrl = url;
+      }
+      if (trailerFile) {
+        const { url } = await api.upload(trailerFile, "videos");
+        payload.trailerUrl = url;
+      }
+      if (editingVideo) {
+        updateMutation.mutate({ id: editingVideo.id, data: payload });
+      } else {
+        createMutation.mutate(payload);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -264,15 +288,15 @@ export default function VideosPage() {
               </div>
               <div className="space-y-2">
                 <Label>Thumbnail Upload</Label>
-                <Input type="file" accept="image/*" />
+                <Input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Video Upload</Label>
-                <Input type="file" accept="video/*" />
+                <Input type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Trailer Upload</Label>
-                <Input type="file" accept="video/*" />
+                <Input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="space-y-2">
                 <Label>Tags</Label>
@@ -294,8 +318,8 @@ export default function VideosPage() {
                 <Label>Featured</Label>
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
               </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                {editingVideo ? "Update Video" : "Upload Video"}
+              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploading}>
+                {uploading ? "Uploading files..." : editingVideo ? "Update Video" : "Upload Video"}
               </Button>
             </form>
           </DialogContent>

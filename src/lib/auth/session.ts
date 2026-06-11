@@ -1,14 +1,15 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { Admin } from "@/types";
-import { MOCK_ADMIN } from "@/lib/mock-data";
+import { verifyAdminPassword } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "vzwakubwa-admin-secret-key-2026"
 );
 
 const COOKIE_NAME = "vzw-admin-session";
-const SESSION_DURATION = 60 * 60 * 24; // 24 hours
+const SESSION_DURATION = 60 * 60 * 24;
 
 export interface SessionPayload {
   adminId: string;
@@ -65,12 +66,11 @@ export async function clearSessionCookie(): Promise<void> {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export function validateCredentials(email: string, password: string): Admin | null {
-  // Mock auth: admin@vzwakubwa.com / admin123
-  if (email === MOCK_ADMIN.email && password === "admin123") {
-    return MOCK_ADMIN;
+export async function validateCredentials(email: string, password: string): Promise<Admin | null> {
+  if (!isDbConfigured()) {
+    throw new Error("Database not configured. Set Supabase environment variables.");
   }
-  return null;
+  return verifyAdminPassword(email, password);
 }
 
 export { COOKIE_NAME };

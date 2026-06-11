@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
-import type { Category } from "@/types";
+import { listCategories, createCategory } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET() {
-  return NextResponse.json({ success: true, data: mockStore.categories });
+  if (!isDbConfigured()) {
+    return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  }
+  try {
+    const data = await listCategories();
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const newCategory: Category = {
-    id: `cat-${Date.now()}`,
-    name: body.name,
-    slug: body.slug || body.name.toLowerCase().replace(/\s+/g, "-"),
-    description: body.description || "",
-    videoCount: 0,
-    thumbnailUrl: body.thumbnailUrl,
-    createdAt: new Date().toISOString(),
-  };
-
-  mockStore.categories.push(newCategory);
-  return NextResponse.json({ success: true, data: newCategory }, { status: 201 });
+  if (!isDbConfigured()) {
+    return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  }
+  try {
+    const body = await request.json();
+    const data = await createCategory(body);
+    return NextResponse.json({ success: true, data }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }

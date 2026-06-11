@@ -1,29 +1,20 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
+import { listUsers } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search")?.toLowerCase();
-  const isVip = searchParams.get("isVip");
-  const isActive = searchParams.get("isActive");
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search") ?? undefined;
+    const isVipParam = searchParams.get("isVip");
+    const isActiveParam = searchParams.get("isActive");
+    const isVip = isVipParam !== null && isVipParam !== "" ? isVipParam === "true" : undefined;
+    const isActive = isActiveParam !== null && isActiveParam !== "" ? isActiveParam === "true" : undefined;
 
-  let users = [...mockStore.users];
-
-  if (search) {
-    users = users.filter(
-      (u) =>
-        u.name.toLowerCase().includes(search) ||
-        u.email.toLowerCase().includes(search)
-    );
+    const data = await listUsers({ search, isVip, isActive });
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
   }
-
-  if (isVip !== null && isVip !== undefined && isVip !== "") {
-    users = users.filter((u) => u.isVip === (isVip === "true"));
-  }
-
-  if (isActive !== null && isActive !== undefined && isActive !== "") {
-    users = users.filter((u) => u.isActive === (isActive === "true"));
-  }
-
-  return NextResponse.json({ success: true, data: users });
 }

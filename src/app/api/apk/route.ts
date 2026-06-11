@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
-import { mockStore } from "@/lib/mock-data";
+import { getSession } from "@/lib/auth/session";
+import { getApk, updateApk } from "@/lib/db/repository";
+import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET() {
-  return NextResponse.json({ success: true, data: mockStore.apk });
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const data = await getApk();
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }
 
 export async function PUT(request: Request) {
-  const body = await request.json();
-  mockStore.apk = { ...mockStore.apk, ...body };
+  if (!isDbConfigured()) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-  mockStore.activityLogs.unshift({
-    id: `log-${Date.now()}`,
-    adminId: "admin-1",
-    adminName: "Super Admin",
-    action: "update",
-    entity: "apk",
-    entityId: mockStore.apk.id,
-    details: `Updated APK to version ${mockStore.apk.version}`,
-    ipAddress: "127.0.0.1",
-    createdAt: new Date().toISOString(),
-  });
-
-  return NextResponse.json({ success: true, data: mockStore.apk });
+    const body = await request.json();
+    const data = await updateApk(body, session.adminId, session.name);
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
 }
