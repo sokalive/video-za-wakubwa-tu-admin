@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node scripts/seed.mjs",
+    "seed:admin": "node scripts/seed-admin.mjs",
     "seed:test-video": "node scripts/seed-test-video.mjs",
     "verify": "node scripts/verify-production.mjs"
   },
