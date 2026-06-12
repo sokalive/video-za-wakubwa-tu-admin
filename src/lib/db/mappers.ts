@@ -33,8 +33,10 @@ export function mapVideo(row: Record<string, any>): Video {
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
     isFeatured: row.is_featured ?? false,
+    autoplay: row.autoplay ?? false,
     tags: Array.isArray(row.tags) ? row.tags : [],
     views: row.views ?? 0,
+    likesCount: row.likes_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -55,6 +57,7 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.resolution !== undefined) data.resolution = video.resolution;
   if (video.isVip !== undefined) data.is_vip = video.isVip;
   if (video.isFeatured !== undefined) data.is_featured = video.isFeatured;
+  if (video.autoplay !== undefined) data.autoplay = video.autoplay;
   if (video.tags !== undefined) data.tags = video.tags;
   if (video.views !== undefined) data.views = video.views;
   data.updated_at = new Date().toISOString();

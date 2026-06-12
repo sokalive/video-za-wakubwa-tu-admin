@@ -220,6 +220,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     resolution: body.resolution ?? "1080p",
     is_vip: body.isVip ?? false,
     is_featured: body.isFeatured ?? false,
+    autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
     views: 0,
     published: true,

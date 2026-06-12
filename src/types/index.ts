@@ -25,8 +25,10 @@ export interface Video {
   resolution: string;
   isVip: boolean;
   isFeatured: boolean;
+  autoplay: boolean;
   tags: string[];
   views: number;
+  likesCount: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -37,6 +37,7 @@ const emptyVideo = {
   googleDriveUrl: "",
   isVip: false,
   isFeatured: false,
+  autoplay: false,
   tags: [] as string[],
 };
 
@@ -131,6 +132,7 @@ export default function VideosPage() {
       googleDriveUrl: video.googleDriveUrl,
       isVip: video.isVip,
       isFeatured: video.isFeatured,
+      autoplay: video.autoplay,
       tags: video.tags,
     });
     setVideoFile(null);
@@ -267,6 +269,7 @@ export default function VideosPage() {
                     <TableHead>Category</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Views</TableHead>
+                    <TableHead>Likes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -308,11 +311,13 @@ export default function VideosPage() {
                         ) : "—"}
                       </TableCell>
                       <TableCell>{formatNumber(video.views)}</TableCell>
+                      <TableCell>{formatNumber(video.likesCount)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {video.isVip && <Badge variant="default"><Crown className="h-3 w-3 mr-1" />VIP</Badge>}
                           {video.isFeatured && <Badge variant="warning"><Star className="h-3 w-3 mr-1" />Featured</Badge>}
-                          {!video.isVip && !video.isFeatured && <Badge variant="secondary">Free</Badge>}
+                          {video.autoplay && <Badge variant="secondary">Autoplay</Badge>}
+                          {!video.isVip && !video.isFeatured && !video.autoplay && <Badge variant="secondary">Free</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -444,6 +449,10 @@ export default function VideosPage() {
               <div className="flex items-center justify-between">
                 <Label>Featured</Label>
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Autoplay on watch page</Label>
+                <Switch checked={form.autoplay} onCheckedChange={(v) => setForm({ ...form, autoplay: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || saving}>
                 {saving ? savePhase || "Saving..." : editingVideo ? "Update Video" : "Save Video"}
