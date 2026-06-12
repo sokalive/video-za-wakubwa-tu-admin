@@ -75,10 +75,24 @@ export const api = {
   },
   vipPlans: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").VipPlan[] }>("/vip-plans"),
+    create: (plan: Partial<import("@/types").VipPlan>) =>
+      fetchApi<{ success: boolean; data: import("@/types").VipPlan }>("/vip-plans", {
+        method: "POST",
+        body: JSON.stringify(plan),
+      }),
     update: (id: string, plan: Partial<import("@/types").VipPlan>) =>
       fetchApi<{ success: boolean; data: import("@/types").VipPlan }>(`/vip-plans/${id}`, {
         method: "PUT",
         body: JSON.stringify(plan),
+      }),
+  },
+  vipTrialSettings: {
+    get: () =>
+      fetchApi<{ success: boolean; data: import("@/types").VipTrialSettings }>("/vip-trial-settings"),
+    update: (settings: Partial<import("@/types").VipTrialSettings>) =>
+      fetchApi<{ success: boolean; data: import("@/types").VipTrialSettings }>("/vip-trial-settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
       }),
   },
   users: {

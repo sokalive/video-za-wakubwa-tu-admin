@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS videos (
   autoplay BOOLEAN NOT NULL DEFAULT false,
   views INT NOT NULL DEFAULT 0,
   likes_count INT NOT NULL DEFAULT 0,
+  trial_enabled BOOLEAN NOT NULL DEFAULT false,
+  trial_duration_value INT NOT NULL DEFAULT 0,
+  trial_duration_unit TEXT NOT NULL DEFAULT 'minutes',
   rating INT NOT NULL DEFAULT 75,
   channel TEXT DEFAULT 'VZW',
   tags TEXT[] DEFAULT '{}',
@@ -72,9 +75,11 @@ CREATE INDEX IF NOT EXISTS idx_videos_published ON videos(published);
 CREATE TABLE IF NOT EXISTS vip_plans (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('daily', 'weekly', 'monthly')),
+  type TEXT DEFAULT 'custom',
   price INT NOT NULL,
   duration_days INT NOT NULL,
+  duration_value INT NOT NULL DEFAULT 1,
+  duration_unit TEXT NOT NULL DEFAULT 'days',
   duration_label TEXT NOT NULL DEFAULT '',
   currency TEXT NOT NULL DEFAULT 'TZS',
   features TEXT[] DEFAULT '{}',
@@ -156,6 +161,9 @@ CREATE TABLE IF NOT EXISTS site_settings (
   contact_email TEXT DEFAULT '',
   contact_phone TEXT DEFAULT '',
   social_links JSONB DEFAULT '[]'::jsonb,
+  vip_trial_enabled BOOLEAN NOT NULL DEFAULT false,
+  vip_trial_duration_value INT NOT NULL DEFAULT 5,
+  vip_trial_duration_unit TEXT NOT NULL DEFAULT 'minutes',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

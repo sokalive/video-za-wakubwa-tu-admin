@@ -1,3 +1,9 @@
+import {
+  durationToDays,
+  formatDurationLabel,
+  inferPlanDurationUnit,
+  type PlanDurationUnit,
+} from "@/lib/duration";
 import type {
   Admin,
   Video,
@@ -37,6 +43,9 @@ export function mapVideo(row: Record<string, any>): Video {
     tags: Array.isArray(row.tags) ? row.tags : [],
     views: row.views ?? 0,
     likesCount: row.likes_count ?? 0,
+    trialEnabled: row.trial_enabled ?? false,
+    trialDurationValue: row.trial_duration_value ?? 0,
+    trialDurationUnit: row.trial_duration_unit ?? "minutes",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -60,6 +69,9 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.autoplay !== undefined) data.autoplay = video.autoplay;
   if (video.tags !== undefined) data.tags = video.tags;
   if (video.views !== undefined) data.views = video.views;
+  if (video.trialEnabled !== undefined) data.trial_enabled = video.trialEnabled;
+  if (video.trialDurationValue !== undefined) data.trial_duration_value = video.trialDurationValue;
+  if (video.trialDurationUnit !== undefined) data.trial_duration_unit = video.trialDurationUnit;
   data.updated_at = new Date().toISOString();
   return data;
 }
@@ -86,14 +98,26 @@ export function mapCategoryToDb(cat: Partial<Category>): Record<string, unknown>
 }
 
 export function mapVipPlan(row: Record<string, any>): VipPlan {
+  const durationValue =
+    typeof row.duration_value === "number"
+      ? row.duration_value
+      : (row.duration_days ?? 1);
+  const durationUnit = (row.duration_unit ??
+    inferPlanDurationUnit(row.duration_days ?? 1, row.type)) as PlanDurationUnit;
+
   return {
     id: row.id,
     name: row.name,
-    type: row.type,
+    type: row.type ?? undefined,
     price: row.price,
-    durationDays: row.duration_days,
+    durationValue,
+    durationUnit,
+    durationDays: row.duration_days ?? durationToDays(durationValue, durationUnit),
+    durationLabel: row.duration_label || formatDurationLabel(durationValue, durationUnit),
+    currency: row.currency ?? "TZS",
     features: row.features ?? [],
     isActive: row.is_active ?? true,
+    popular: row.popular ?? false,
   };
 }
 
@@ -101,9 +125,21 @@ export function mapVipPlanToDb(plan: Partial<VipPlan>): Record<string, unknown> 
   const data: Record<string, unknown> = {};
   if (plan.name !== undefined) data.name = plan.name;
   if (plan.price !== undefined) data.price = plan.price;
-  if (plan.durationDays !== undefined) data.duration_days = plan.durationDays;
+  if (plan.currency !== undefined) data.currency = plan.currency;
   if (plan.features !== undefined) data.features = plan.features;
   if (plan.isActive !== undefined) data.is_active = plan.isActive;
+  if (plan.popular !== undefined) data.popular = plan.popular;
+  if (plan.type !== undefined) data.type = plan.type;
+
+  if (plan.durationValue !== undefined && plan.durationUnit !== undefined) {
+    data.duration_value = plan.durationValue;
+    data.duration_unit = plan.durationUnit;
+    data.duration_days = durationToDays(plan.durationValue, plan.durationUnit);
+    data.duration_label = formatDurationLabel(plan.durationValue, plan.durationUnit);
+  } else if (plan.durationDays !== undefined) {
+    data.duration_days = plan.durationDays;
+  }
+
   return data;
 }
 
@@ -223,6 +259,11 @@ export function mapSettings(row: Record<string, any>): SiteSettings {
     contactEmail: row.contact_email ?? "",
     contactPhone: row.contact_phone ?? "",
     socialLinks: row.social_links ?? [],
+    vipTrial: {
+      enabled: row.vip_trial_enabled ?? false,
+      durationValue: row.vip_trial_duration_value ?? 5,
+      durationUnit: row.vip_trial_duration_unit ?? "minutes",
+    },
   };
 }
 
@@ -235,6 +276,25 @@ export function mapSettingsToDb(s: Partial<SiteSettings>): Record<string, unknow
   if (s.contactEmail !== undefined) data.contact_email = s.contactEmail;
   if (s.contactPhone !== undefined) data.contact_phone = s.contactPhone;
   if (s.socialLinks !== undefined) data.social_links = s.socialLinks;
+  if (s.vipTrial?.enabled !== undefined) data.vip_trial_enabled = s.vipTrial.enabled;
+  if (s.vipTrial?.durationValue !== undefined) data.vip_trial_duration_value = s.vipTrial.durationValue;
+  if (s.vipTrial?.durationUnit !== undefined) data.vip_trial_duration_unit = s.vipTrial.durationUnit;
+  return data;
+}
+
+export function mapVipTrialSettings(row: Record<string, any>) {
+  return {
+    enabled: row.vip_trial_enabled ?? false,
+    durationValue: row.vip_trial_duration_value ?? 5,
+    durationUnit: row.vip_trial_duration_unit ?? "minutes",
+  };
+}
+
+export function mapVipTrialSettingsToDb(settings: Partial<import("@/types").VipTrialSettings>) {
+  const data: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (settings.enabled !== undefined) data.vip_trial_enabled = settings.enabled;
+  if (settings.durationValue !== undefined) data.vip_trial_duration_value = settings.durationValue;
+  if (settings.durationUnit !== undefined) data.vip_trial_duration_unit = settings.durationUnit;
   return data;
 }
 

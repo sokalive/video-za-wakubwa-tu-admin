@@ -10,6 +10,16 @@ export interface Admin {
 
 export type VideoStorage = "r2" | "google_drive";
 
+export type PlanDurationUnit =
+  | "seconds"
+  | "minutes"
+  | "hours"
+  | "days"
+  | "weeks"
+  | "months";
+
+export type TrialDurationUnit = "seconds" | "minutes" | "hours";
+
 export interface Video {
   id: string;
   title: string;
@@ -29,6 +39,9 @@ export interface Video {
   tags: string[];
   views: number;
   likesCount: number;
+  trialEnabled: boolean;
+  trialDurationValue: number;
+  trialDurationUnit: TrialDurationUnit;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,11 +59,22 @@ export interface Category {
 export interface VipPlan {
   id: string;
   name: string;
-  type: "daily" | "weekly" | "monthly";
+  type?: string;
   price: number;
+  durationValue: number;
+  durationUnit: PlanDurationUnit;
   durationDays: number;
+  durationLabel: string;
+  currency: string;
   features: string[];
   isActive: boolean;
+  popular: boolean;
+}
+
+export interface VipTrialSettings {
+  enabled: boolean;
+  durationValue: number;
+  durationUnit: TrialDurationUnit;
 }
 
 export interface User {
@@ -161,6 +185,7 @@ export interface SiteSettings {
   contactEmail: string;
   contactPhone: string;
   socialLinks: { platform: string; url: string }[];
+  vipTrial: VipTrialSettings;
 }
 
 export interface LoginCredentials {

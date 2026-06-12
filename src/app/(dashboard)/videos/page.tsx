@@ -25,7 +25,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatNumber } from "@/lib/utils";
 import { formatBytes } from "@/lib/r2-upload";
-import type { Video, VideoStorage } from "@/types";
+import type { TrialDurationUnit, Video, VideoStorage } from "@/types";
+import { TRIAL_DURATION_UNITS } from "@/lib/duration";
 
 const emptyVideo = {
   title: "",
@@ -38,6 +39,9 @@ const emptyVideo = {
   isVip: false,
   isFeatured: false,
   autoplay: false,
+  trialEnabled: false,
+  trialDurationValue: 5,
+  trialDurationUnit: "minutes" as TrialDurationUnit,
   tags: [] as string[],
 };
 
@@ -70,6 +74,13 @@ export default function VideosPage() {
     queryKey: ["categories"],
     queryFn: () => api.categories.list(),
   });
+
+  const { data: trialSettingsData } = useQuery({
+    queryKey: ["vip-trial-settings"],
+    queryFn: () => api.vipTrialSettings.get(),
+  });
+
+  const globalTrial = trialSettingsData?.data;
 
   const { data: r2Status } = useQuery({
     queryKey: ["r2", "status"],
@@ -136,6 +147,9 @@ export default function VideosPage() {
       isVip: video.isVip,
       isFeatured: video.isFeatured,
       autoplay: video.autoplay,
+      trialEnabled: video.trialEnabled,
+      trialDurationValue: video.trialDurationValue,
+      trialDurationUnit: video.trialDurationUnit,
       tags: video.tags,
     });
     setVideoFile(null);
@@ -447,8 +461,72 @@ export default function VideosPage() {
               </div>
               <div className="flex items-center justify-between">
                 <Label>VIP Content</Label>
-                <Switch checked={form.isVip} onCheckedChange={(v) => setForm({ ...form, isVip: v })} />
+                <Switch
+                  checked={form.isVip}
+                  onCheckedChange={(v) => {
+                    const next = { ...form, isVip: v };
+                    if (v && !editingVideo && globalTrial?.enabled) {
+                      next.trialEnabled = true;
+                      next.trialDurationValue = globalTrial.durationValue;
+                      next.trialDurationUnit = globalTrial.durationUnit;
+                    }
+                    setForm(next);
+                  }}
+                />
               </div>
+              {form.isVip && (
+                <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Enable Trial</Label>
+                    <Switch
+                      checked={form.trialEnabled}
+                      onCheckedChange={(trialEnabled) => setForm({ ...form, trialEnabled })}
+                    />
+                  </div>
+                  {form.trialEnabled && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Trial Duration</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={form.trialDurationValue}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              trialDurationValue: Math.max(1, Number(e.target.value) || 1),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Trial Unit</Label>
+                        <Select
+                          value={form.trialDurationUnit}
+                          onValueChange={(v) =>
+                            setForm({ ...form, trialDurationUnit: v as TrialDurationUnit })
+                          }
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {TRIAL_DURATION_UNITS.map((unit) => (
+                              <SelectItem key={unit} value={unit}>
+                                {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  {!editingVideo && globalTrial?.enabled && (
+                    <p className="text-xs text-gray-500">
+                      Global trial is on — new VIP videos default to {globalTrial.durationValue}{" "}
+                      {globalTrial.durationUnit} unless you override here.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <Label>Featured</Label>
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />

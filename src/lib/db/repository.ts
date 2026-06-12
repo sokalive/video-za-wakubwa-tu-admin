@@ -18,6 +18,8 @@ import {
   mapActivityLog,
   mapSettings,
   mapSettingsToDb,
+  mapVipTrialSettings,
+  mapVipTrialSettingsToDb,
   mapVideoReport,
   mapVideoLikeStat,
   computeDashboardStats,
@@ -204,6 +206,20 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     throw new Error("Invalid video source. Upload a file to R2.");
   }
 
+  const isVip = body.isVip ?? false;
+  let trialEnabled = body.trialEnabled ?? false;
+  let trialDurationValue = body.trialDurationValue ?? 0;
+  let trialDurationUnit = body.trialDurationUnit ?? "minutes";
+
+  if (isVip && body.trialEnabled === undefined && body.trialDurationValue === undefined) {
+    const trialDefaults = await getVipTrialSettings();
+    if (trialDefaults.enabled) {
+      trialEnabled = true;
+      trialDurationValue = trialDefaults.durationValue;
+      trialDurationUnit = trialDefaults.durationUnit;
+    }
+  }
+
   const id = `vid-${Date.now()}`;
   const row = {
     id,
@@ -218,12 +234,15 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     google_drive_url: storedDriveUrl,
     duration: body.duration ?? "0:00",
     resolution: body.resolution ?? "1080p",
-    is_vip: body.isVip ?? false,
+    is_vip: isVip,
     is_featured: body.isFeatured ?? false,
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
     views: 0,
     likes_count: 0,
+    trial_enabled: trialEnabled,
+    trial_duration_value: trialDurationValue,
+    trial_duration_unit: trialDurationUnit,
     published: true,
   };
   const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
@@ -402,6 +421,35 @@ export async function listVipPlans(): Promise<VipPlan[]> {
   return (data ?? []).map(mapVipPlan);
 }
 
+export async function createVipPlan(body: Partial<VipPlan>): Promise<VipPlan> {
+  const id = body.id?.trim() || `plan-${Date.now()}`;
+  const row = {
+    id,
+    type: body.type ?? "custom",
+    ...mapVipPlanToDb({
+      name: body.name ?? "New Plan",
+      price: body.price ?? 0,
+      durationValue: body.durationValue ?? 1,
+      durationUnit: body.durationUnit ?? "days",
+      currency: body.currency ?? "TZS",
+      features: body.features ?? [],
+      isActive: body.isActive ?? true,
+      popular: body.popular ?? false,
+      type: body.type ?? "custom",
+    }),
+  };
+
+  const { data: rows, error } = await supabaseRest<Record<string, unknown>[]>("vip_plans", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(row),
+  });
+  if (error) throw new Error(error);
+  const created = rows?.[0];
+  if (!created) throw new Error("Failed to create VIP plan.");
+  return mapVipPlan(created);
+}
+
 export async function updateVipPlan(id: string, body: Partial<VipPlan>): Promise<VipPlan> {
   const updates = mapVipPlanToDb(body);
   const { data: rows, error } = await supabaseRest<Record<string, unknown>[]>(
@@ -522,9 +570,27 @@ export async function getSettings(): Promise<SiteSettings> {
       contactEmail: "",
       contactPhone: "",
       socialLinks: [],
+      vipTrial: { enabled: false, durationValue: 5, durationUnit: "minutes" },
     };
   }
   return mapSettings(data);
+}
+
+export async function getVipTrialSettings(): Promise<import("@/types").VipTrialSettings> {
+  const settings = await getSettings();
+  return settings.vipTrial;
+}
+
+export async function updateVipTrialSettings(
+  body: Partial<import("@/types").VipTrialSettings>
+): Promise<import("@/types").VipTrialSettings> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("site_settings")
+    .upsert({ id: "main", ...mapVipTrialSettingsToDb(body) })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return mapVipTrialSettings(data);
 }
 
 export async function updateSettings(body: Partial<SiteSettings>): Promise<SiteSettings> {
