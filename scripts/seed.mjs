@@ -57,9 +57,9 @@ async function seed() {
 
   // Seed VIP plans
   const plans = [
-    { id: "plan-daily", name: "Kila Siku", type: "daily", price: 2000, duration_days: 1, duration_label: "24 Masaa", features: ["Ufikiaji wa video zote", "Ubora wa HD", "Bila matangazo", "Pakua kwa simu"] },
-    { id: "plan-weekly", name: "Kila Wiki", type: "weekly", price: 8000, duration_days: 7, duration_label: "7 Siku", popular: true, features: ["Ufikiaji wa video zote", "Ubora wa Full HD", "Bila matangazo", "Pakua kwa simu", "Msaada wa haraka"] },
-    { id: "plan-monthly", name: "Kila Mwezi", type: "monthly", price: 20000, duration_days: 30, duration_label: "30 Siku", features: ["Ufikiaji wa video zote", "Ubora wa 4K", "Bila matangazo", "Pakua bila kikomo", "Msaada wa kipaumbele", "VIP badge"] },
+    { id: "plan-daily", name: "1 Day", type: "daily", price: 2000, duration_days: 1, duration_label: "1 Day", currency: "TZS", is_active: true, features: ["Access all VIP videos", "HD quality", "No ads"] },
+    { id: "plan-weekly", name: "1 Week", type: "weekly", price: 8000, duration_days: 7, duration_label: "1 Week", currency: "TZS", is_active: true, popular: true, features: ["Access all VIP videos", "Full HD quality", "No ads", "Priority support"] },
+    { id: "plan-monthly", name: "1 Month", type: "monthly", price: 20000, duration_days: 30, duration_label: "1 Month", currency: "TZS", is_active: true, features: ["Access all VIP videos", "Best quality", "No ads", "Unlimited downloads", "VIP badge"] },
   ];
   for (const plan of plans) {
     await db.from("vip_plans").upsert(plan, { onConflict: "id" });

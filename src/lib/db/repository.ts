@@ -224,7 +224,6 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     tags: body.tags ?? [],
     views: 0,
     likes_count: 0,
-    autoplay: body.autoplay ?? false,
     published: true,
   };
   const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
@@ -396,14 +395,27 @@ export async function deleteCategory(id: string): Promise<void> {
 // ─── VIP Plans ──────────────────────────────────────────────
 
 export async function listVipPlans(): Promise<VipPlan[]> {
-  const { data } = await getSupabaseAdmin().from("vip_plans").select("*").order("duration_days");
+  const { data, error } = await supabaseRest<Record<string, unknown>[]>(
+    "vip_plans?select=*&order=duration_days.asc"
+  );
+  if (error) throw new Error(`Failed to load VIP plans: ${error}`);
   return (data ?? []).map(mapVipPlan);
 }
 
 export async function updateVipPlan(id: string, body: Partial<VipPlan>): Promise<VipPlan> {
-  const { data, error } = await getSupabaseAdmin().from("vip_plans").update(mapVipPlanToDb(body)).eq("id", id).select().single();
-  if (error) throw new Error(error.message);
-  return mapVipPlan(data);
+  const updates = mapVipPlanToDb(body);
+  const { data: rows, error } = await supabaseRest<Record<string, unknown>[]>(
+    `vip_plans?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(updates),
+    }
+  );
+  if (error) throw new Error(error);
+  const updated = rows?.[0];
+  if (!updated) throw new Error("VIP plan not found.");
+  return mapVipPlan(updated);
 }
 
 // ─── APK ────────────────────────────────────────────────────

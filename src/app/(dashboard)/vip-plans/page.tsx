@@ -49,6 +49,14 @@ export default function VipPlansPage() {
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-80 rounded-xl" />
           ))
+        ) : plans.length === 0 ? (
+          <Card className="md:col-span-3">
+            <CardContent className="p-6 text-sm text-gray-400">
+              No VIP plans found. Run{" "}
+              <code className="text-gray-300">npm run seed:vip-plans</code> or{" "}
+              <code className="text-gray-300">GET /api/setup/seed-vip-plans</code> on production.
+            </CardContent>
+          </Card>
         ) : (
           plans.map((plan) => (
             <Card key={plan.id} className="relative overflow-hidden">
