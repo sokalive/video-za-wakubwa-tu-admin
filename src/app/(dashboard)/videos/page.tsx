@@ -61,6 +61,9 @@ export default function VideosPage() {
       search: search || undefined,
       isVip: filterVip !== "all" ? filterVip : undefined,
     }),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const { data: categoriesData } = useQuery({
