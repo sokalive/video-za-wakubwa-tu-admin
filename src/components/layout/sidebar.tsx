@@ -34,6 +34,7 @@ const navItems = [
   { href: "/vip-trial-settings", label: "VIP Trial Settings", icon: Timer },
   { href: "/sonicpesa", label: "SonicPesa Settings", icon: Zap },
   { href: "/users", label: "Users", icon: Users },
+  { href: "/subscriptions", label: "VIP Subscriptions", icon: Crown },
   { href: "/payments", label: "Payments", icon: CreditCard },
   { href: "/apk", label: "APK Manager", icon: Smartphone },
   { href: "/advertisements", label: "Advertisements", icon: Megaphone },

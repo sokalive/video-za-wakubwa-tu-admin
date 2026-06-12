@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listUsers, getUserStats } from "@/lib/db/repository";
+import { listDeviceUsers, getDeviceUserStats } from "@/lib/db/admin-data";
 import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET(request: Request) {
@@ -13,8 +13,8 @@ export async function GET(request: Request) {
     const isActive = isActiveParam !== null && isActiveParam !== "" ? isActiveParam === "true" : undefined;
 
     const [data, stats] = await Promise.all([
-      listUsers({ search, isVip, isActive }),
-      getUserStats(),
+      listDeviceUsers({ search, isVip, isActive }),
+      getDeviceUserStats(),
     ]);
     return NextResponse.json({ success: true, data, stats });
   } catch (err) {

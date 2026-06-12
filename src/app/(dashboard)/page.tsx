@@ -44,7 +44,7 @@ export default function DashboardPage() {
           <>
             <div className="grid gap-6 lg:grid-cols-2">
               <ChartCard
-                title="Daily Views (Last 30 Days — 0 until view tracking is enabled)"
+                title="Daily Views (Last 30 Days)"
                 data={analytics.dailyViews}
                 dataKey="views"
                 xKey="date"

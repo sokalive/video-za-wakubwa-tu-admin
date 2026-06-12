@@ -154,6 +154,7 @@ export function mapApk(row: Record<string, any>): ApkRelease {
     forceUpdate: row.force_update ?? false,
     downloadCount: row.download_count ?? 0,
     createdAt: row.created_at,
+    isCurrent: row.is_current ?? row.id === "current",
   };
 }
 

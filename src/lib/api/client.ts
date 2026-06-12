@@ -123,10 +123,38 @@ export const api = {
     },
   },
   payments: {
-    list: () => fetchApi<{ success: boolean; data: import("@/types").Payment[] }>("/payments"),
+    list: (params?: { status?: string; refresh?: boolean }) => {
+      const query = new URLSearchParams();
+      if (params?.status) query.set("status", params.status);
+      if (params?.refresh) query.set("refresh", "1");
+      const qs = query.toString();
+      return fetchApi<{
+        success: boolean;
+        data: import("@/types").BillingTransaction[];
+        stats: import("@/types").PaymentStats;
+      }>(`/payments${qs ? `?${qs}` : ""}`);
+    },
+  },
+  subscriptions: {
+    list: () =>
+      fetchApi<{ success: boolean; data: import("@/types").DeviceSubscription[] }>("/subscriptions"),
+    manage: (body: {
+      deviceId: string;
+      action: "extend" | "reduce" | "remove" | "activate" | "deactivate";
+      days?: number;
+      hours?: number;
+      expiresAt?: string;
+      planId?: string;
+    }) =>
+      fetchApi<{ success: boolean; data: Record<string, unknown> }>("/subscriptions", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
   },
   apk: {
     get: () => fetchApi<{ success: boolean; data: import("@/types").ApkRelease }>("/apk"),
+    history: () =>
+      fetchApi<{ success: boolean; data: import("@/types").ApkRelease[] }>("/apk?history=1"),
     update: (data: Partial<import("@/types").ApkRelease>) =>
       fetchApi<{ success: boolean; data: import("@/types").ApkRelease }>("/apk", {
         method: "PUT",

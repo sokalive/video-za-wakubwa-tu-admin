@@ -469,24 +469,66 @@ export async function updateVipPlan(id: string, body: Partial<VipPlan>): Promise
 // ─── APK ────────────────────────────────────────────────────
 
 export async function getApk(): Promise<ApkRelease | null> {
-  const { data } = await getSupabaseAdmin().from("apk_releases").select("*").eq("id", "current").single();
-  return data ? mapApk(data) : null;
+  const db = getSupabaseAdmin();
+  const { data: current } = await db
+    .from("apk_releases")
+    .select("*")
+    .eq("is_current", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (current) return mapApk(current);
+
+  const { data: legacy } = await db.from("apk_releases").select("*").eq("id", "current").maybeSingle();
+  return legacy ? mapApk(legacy) : null;
+}
+
+export async function listApkHistory(): Promise<ApkRelease[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("apk_releases")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapApk);
 }
 
 export async function updateApk(body: Partial<ApkRelease>, adminId: string, adminName: string): Promise<ApkRelease> {
   const db = getSupabaseAdmin();
-  const updates: Record<string, unknown> = { id: "current" };
-  if (body.version) updates.version = body.version;
-  if (body.fileUrl) updates.file_url = body.fileUrl;
-  if (body.fileSize) updates.file_size = body.fileSize;
-  if (body.releaseNotes) updates.release_notes = body.releaseNotes;
-  if (body.screenshots) updates.screenshots = body.screenshots;
-  if (body.forceUpdate !== undefined) updates.force_update = body.forceUpdate;
-  updates.created_at = new Date().toISOString();
+  const id = `apk-${Date.now()}`;
+  const row: Record<string, unknown> = {
+    id,
+    version: body.version ?? "1.0.0",
+    file_url: body.fileUrl ?? "",
+    file_size: body.fileSize ?? "",
+    release_notes: body.releaseNotes ?? "",
+    screenshots: body.screenshots ?? [],
+    force_update: body.forceUpdate ?? false,
+    download_count: 0,
+    is_current: true,
+    created_at: new Date().toISOString(),
+  };
 
-  const { data, error } = await db.from("apk_releases").upsert(updates).select().single();
-  if (error) throw new Error(error.message);
-  await logActivity(adminId, adminName, "update", "apk", `Updated APK to version ${body.version ?? data.version}`, "current");
+  await db.from("apk_releases").update({ is_current: false }).eq("is_current", true);
+  await db.from("apk_releases").update({ is_current: false }).eq("id", "current");
+
+  const { data, error } = await db.from("apk_releases").insert(row).select().single();
+  if (error) {
+    const updates: Record<string, unknown> = { id: "current", is_current: true };
+    if (body.version) updates.version = body.version;
+    if (body.fileUrl) updates.file_url = body.fileUrl;
+    if (body.fileSize) updates.file_size = body.fileSize;
+    if (body.releaseNotes) updates.release_notes = body.releaseNotes;
+    if (body.screenshots) updates.screenshots = body.screenshots;
+    if (body.forceUpdate !== undefined) updates.force_update = body.forceUpdate;
+    updates.created_at = new Date().toISOString();
+    const { data: upserted, error: upsertErr } = await db.from("apk_releases").upsert(updates).select().single();
+    if (upsertErr) throw new Error(upsertErr.message);
+    await logActivity(adminId, adminName, "update", "apk", `Updated APK to version ${body.version ?? upserted.version}`, "current");
+    return mapApk(upserted);
+  }
+
+  await logActivity(adminId, adminName, "update", "apk", `Uploaded APK version ${row.version}`, id);
   return mapApk(data);
 }
 

@@ -1,6 +1,6 @@
 import { supabaseRest } from "@/lib/db/rest";
 import { durationToDays, type PlanDurationUnit } from "@/lib/duration";
-import { computeStackedExpiryIso } from "@/lib/payments/subscription-stacking";
+import { computeStackedExpiryFromDuration } from "@/lib/payments/subscription-stacking";
 
 export interface TransactionRow {
   id: number;
@@ -239,17 +239,20 @@ export async function listTransactionsAdmin(filters: { status?: string } = {}) {
   return data ?? [];
 }
 
-async function getVipPlanDurationDays(planId: string): Promise<number> {
+async function getVipPlanDuration(planId: string): Promise<{ value: number; unit: PlanDurationUnit }> {
   const { data, error } = await supabaseRest<
     { duration_days: number; duration_value: number; duration_unit: string }[]
   >(`vip_plans?id=eq.${encodeURIComponent(planId)}&limit=1`);
   if (error) throw new Error(error);
   const plan = data?.[0];
-  if (!plan) return 30;
+  if (!plan) return { value: 30, unit: "days" };
   if (plan.duration_value && plan.duration_unit) {
-    return durationToDays(plan.duration_value, plan.duration_unit as PlanDurationUnit);
+    return {
+      value: plan.duration_value,
+      unit: plan.duration_unit as PlanDurationUnit,
+    };
   }
-  return Math.max(1, Number(plan.duration_days) || 30);
+  return { value: Math.max(1, Number(plan.duration_days) || 30), unit: "days" };
 }
 
 async function deviceSubscriptionOrderAlreadyApplied(orderId: string): Promise<boolean> {
@@ -309,9 +312,16 @@ async function upsertDeviceSubscriptionActive({
   return { skipped: false };
 }
 
-async function computeDeviceSubscriptionExpiryAfterPurchase(deviceId: string, durationDays: number) {
+async function computeDeviceSubscriptionExpiryAfterPurchase(
+  deviceId: string,
+  duration: { value: number; unit: PlanDurationUnit }
+) {
   const existing = await getDeviceSubscription(deviceId);
-  return computeStackedExpiryIso(existing?.expires_at ?? null, durationDays);
+  return computeStackedExpiryFromDuration(
+    existing?.expires_at ?? null,
+    duration.value,
+    duration.unit
+  );
 }
 
 export async function tryActivateDeviceSubscriptionFromCompletedTxn(txn: TransactionRow) {
@@ -329,8 +339,8 @@ export async function tryActivateDeviceSubscriptionFromCompletedTxn(txn: Transac
   if (!deviceId) {
     return { activated: false, skipped: true, reason: "no_device_id", deviceId: null, orderId };
   }
-  const durationDays = await getVipPlanDurationDays(planId);
-  const stack = await computeDeviceSubscriptionExpiryAfterPurchase(deviceId, durationDays);
+  const duration = await getVipPlanDuration(planId);
+  const stack = await computeDeviceSubscriptionExpiryAfterPurchase(deviceId, duration);
   const { skipped } = await upsertDeviceSubscriptionActive({
     deviceId,
     orderId,

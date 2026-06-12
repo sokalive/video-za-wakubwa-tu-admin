@@ -33,12 +33,14 @@ export default function AnalyticsPage() {
             <TabsTrigger value="weekly">Weekly Views</TabsTrigger>
             <TabsTrigger value="monthly">Monthly Views</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
+            <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+            <TabsTrigger value="users">User Growth</TabsTrigger>
             <TabsTrigger value="top">Top Content</TabsTrigger>
             <TabsTrigger value="likes">Most Liked</TabsTrigger>
           </TabsList>
 
           <TabsContent value="daily" className="mt-6">
-            <ChartCard title="Daily Views (0 until view tracking is enabled)" data={analytics.dailyViews} dataKey="views" xKey="date" color="#6366f1" />
+            <ChartCard title="Daily Views (Last 30 Days)" data={analytics.dailyViews} dataKey="views" xKey="date" color="#6366f1" />
           </TabsContent>
 
           <TabsContent value="weekly" className="mt-6">
@@ -50,7 +52,28 @@ export default function AnalyticsPage() {
           </TabsContent>
 
           <TabsContent value="revenue" className="mt-6">
-            <ChartCard title="Revenue Chart" data={analytics.revenueChart} dataKey="revenue" xKey="date" formatValue={formatCurrency} color="#10b981" />
+            <ChartCard title="SonicPesa Revenue (Last 30 Days)" data={analytics.revenueChart} dataKey="revenue" xKey="date" formatValue={formatCurrency} color="#10b981" />
+          </TabsContent>
+
+          <TabsContent value="subscriptions" className="mt-6">
+            <ChartCard
+              title="New VIP Subscriptions by Month"
+              data={analytics.subscriptionGrowth ?? []}
+              dataKey="count"
+              xKey="month"
+              type="bar"
+              color="#f59e0b"
+            />
+          </TabsContent>
+
+          <TabsContent value="users" className="mt-6">
+            <ChartCard
+              title="New Devices (First Payment)"
+              data={analytics.userGrowth ?? []}
+              dataKey="users"
+              xKey="date"
+              color="#ec4899"
+            />
           </TabsContent>
 
           <TabsContent value="top" className="mt-6">

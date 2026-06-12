@@ -158,6 +158,7 @@ export interface ApkRelease {
   forceUpdate: boolean;
   downloadCount: number;
   createdAt: string;
+  isCurrent?: boolean;
 }
 
 export interface Advertisement {
@@ -199,9 +200,36 @@ export interface AnalyticsData {
   weeklyViews: { week: string; views: number }[];
   monthlyViews: { month: string; views: number }[];
   revenueChart: { date: string; revenue: number }[];
+  subscriptionGrowth?: { month: string; count: number }[];
+  userGrowth?: { date: string; users: number }[];
   topVideos: { id: string; title: string; views: number; revenue: number }[];
   topCategories: { id: string; name: string; views: number; videoCount: number }[];
   topLikedVideos: { id: string; title: string; likesCount: number; views: number }[];
+}
+
+export interface PaymentStats {
+  totalRevenue: number;
+  totalTransactions: number;
+  completedCount: number;
+  pendingCount: number;
+  failedCount: number;
+  recalculatedAt: string;
+}
+
+export interface DeviceSubscription {
+  deviceId: string;
+  status: "active" | "pending";
+  expiresAt: string;
+  startedAt: string;
+  transactionId: string;
+  updatedAt: string;
+  active: boolean;
+  phone?: string;
+  totalSpent: number;
+}
+
+export interface ApkReleaseHistory extends ApkRelease {
+  isCurrent: boolean;
 }
 
 export interface VideoReport {

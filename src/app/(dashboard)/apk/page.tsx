@@ -28,12 +28,18 @@ export default function ApkPage() {
     queryFn: () => api.apk.get(),
   });
 
+  const { data: historyData } = useQuery({
+    queryKey: ["apk-history"],
+    queryFn: () => api.apk.history(),
+  });
+
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => api.apk.update(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["apk"] }),
   });
 
   const apk = data?.data;
+  const history = historyData?.data ?? [];
 
   if (isLoading) {
     return (
@@ -79,8 +85,10 @@ export default function ApkPage() {
                   <p className="text-sm font-medium text-gray-400 mb-2">Release Notes</p>
                   <pre className="text-sm text-gray-300 whitespace-pre-wrap bg-white/5 rounded-lg p-4">{apk.releaseNotes}</pre>
                 </div>
-                <Button variant="outline" className="w-full">
-                  <Download className="h-4 w-4 mr-2" /> Download APK
+                <Button variant="outline" className="w-full" asChild>
+                  <a href={apk.fileUrl} download target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-2" /> Download APK
+                  </a>
                 </Button>
               </>
             )}
@@ -159,6 +167,40 @@ export default function ApkPage() {
           </CardContent>
         </Card>
       </div>
+
+      {history.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader><CardTitle>Version History</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-gray-400">
+                  <th className="p-3 text-left">Version</th>
+                  <th className="p-3 text-left">Released</th>
+                  <th className="p-3 text-left">Size</th>
+                  <th className="p-3 text-left">Downloads</th>
+                  <th className="p-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-b border-white/5">
+                    <td className="p-3 text-white font-medium">v{h.version}</td>
+                    <td className="p-3 text-gray-400">{formatDate(h.createdAt)}</td>
+                    <td className="p-3 text-gray-400">{h.fileSize || "—"}</td>
+                    <td className="p-3 text-gray-400">{formatNumber(h.downloadCount)}</td>
+                    <td className="p-3">
+                      <Badge variant={h.isCurrent || h.id === "current" ? "success" : "secondary"}>
+                        {h.forceUpdate ? "Force Update" : h.isCurrent || h.id === "current" ? "Current" : "Archived"}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
 
       {apk && apk.screenshots.length > 0 && (
         <Card className="mt-6">

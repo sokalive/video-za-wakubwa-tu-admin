@@ -12,6 +12,28 @@ export const TRIAL_DURATION_UNITS = ["seconds", "minutes", "hours"] as const;
 export type PlanDurationUnit = (typeof PLAN_DURATION_UNITS)[number];
 export type TrialDurationUnit = (typeof TRIAL_DURATION_UNITS)[number];
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function durationToMs(value: number, unit: PlanDurationUnit): number {
+  const v = Math.max(1, Math.trunc(Number(value) || 1));
+  switch (unit) {
+    case "seconds":
+      return v * 1000;
+    case "minutes":
+      return v * 60 * 1000;
+    case "hours":
+      return v * 3600 * 1000;
+    case "days":
+      return v * MS_PER_DAY;
+    case "weeks":
+      return v * 7 * MS_PER_DAY;
+    case "months":
+      return v * 30 * MS_PER_DAY;
+    default:
+      return v * MS_PER_DAY;
+  }
+}
+
 export function durationToDays(value: number, unit: PlanDurationUnit): number {
   const v = Math.max(0, value);
   switch (unit) {
