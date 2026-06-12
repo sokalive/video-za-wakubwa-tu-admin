@@ -50,23 +50,8 @@ async function main() {
   if (!process.env.JWT_SECRET) warn("JWT_SECRET", "not set — using default (not safe for production)");
   else pass("JWT_SECRET");
 
-  console.log("\n1b. Google Drive Upload");
-  const driveJson = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON;
-  const driveB64 = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64;
-  const driveFolder = process.env.GOOGLE_DRIVE_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_URL;
-  if (!driveJson && !driveB64 && !(process.env.GOOGLE_DRIVE_CLIENT_EMAIL && process.env.GOOGLE_DRIVE_PRIVATE_KEY)) {
-    warn("GOOGLE_DRIVE credentials", "not set — video file upload disabled (paste links only)");
-  } else pass("GOOGLE_DRIVE credentials env present");
-  if (!driveFolder) fail("GOOGLE_DRIVE_FOLDER_ID", "not set — required for uploads (add folder ID from Drive URL)");
-  else pass(`GOOGLE_DRIVE_FOLDER_ID (${driveFolder.slice(0, 12)}...)`);
-  if (driveJson) {
-    try {
-      JSON.parse(driveJson.trim().replace(/^["']|["']$/g, ""));
-      pass("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON parses as JSON");
-    } catch {
-      warn("GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON", "invalid JSON — use minified single line or BASE64 variant");
-    }
-  }
+  console.log("\n1b. Google Drive");
+  pass("Share-link workflow — no GOOGLE_DRIVE env vars required");
 
   if (!url || !serviceKey) {
     console.log("\nCannot continue without Supabase credentials.\n");

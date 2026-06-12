@@ -1,122 +1,47 @@
-# Google Drive Video Upload Setup
+# Google Drive Share Link Workflow
 
-Videos are stored on **Google Drive** (not Vercel or Supabase Storage). The admin panel uploads files directly to Google Drive using a **service account** and saves the shareable link in Supabase.
+Videos are stored on **Google Drive**. The admin uploads files manually in Google Drive, then pastes the share link in the admin panel. The link is saved in Supabase as `videos.google_drive_url`.
 
-## Architecture
+The public website plays videos using that URL (Google Drive embed).
 
-```
-Admin selects video file
-    → POST /api/drive/upload/session (creates resumable upload URL)
-    → Browser uploads bytes directly to Google Drive (large files supported)
-    → POST /api/drive/upload/finalize (sets public link permission)
-    → Share URL saved in Supabase videos.google_drive_url
-    → Public website plays video via Google Drive embed
-```
-
-Thumbnails and APK files still use **Supabase Storage** (`media` bucket).
+**No service account or folder env vars are required.**
 
 ---
 
-## Step 1: Google Cloud Project
+## Admin workflow: add a video
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a project (or select existing)
-3. Enable **Google Drive API**:
-   - APIs & Services → Library → search "Google Drive API" → Enable
-
----
-
-## Step 2: Service Account
-
-1. APIs & Services → **Credentials**
-2. Create Credentials → **Service account**
-3. Name: `vzw-video-uploader` (any name)
-4. Skip optional role grants → Done
-5. Click the service account → **Keys** tab → Add Key → **Create new key** → JSON
-6. Save the downloaded JSON file securely
-
-Note the service account email, e.g.:
-```
-vzw-video-uploader@your-project.iam.gserviceaccount.com
-```
-
----
-
-## Step 3: Google Drive Folder
-
-1. In [Google Drive](https://drive.google.com), create a folder e.g. `VZW Videos`
-2. Right-click folder → **Share**
-3. Add the **service account email** with **Editor** access
-4. Copy the **Folder ID** from the URL:
+1. **Upload video to Google Drive** (your personal Drive or Shared Drive).
+2. Right-click the file → **Share** → set to **Anyone with the link** (Viewer).
+3. Copy the share link, e.g.:
    ```
-   https://drive.google.com/drive/folders/FOLDER_ID_HERE
+   https://drive.google.com/file/d/FILE_ID/view
    ```
+4. Log in to the admin panel → **Videos** → **Add Video**.
+5. Fill in:
+   - **Video Title**
+   - **Description**
+   - **Google Drive Share Link** (paste from step 3)
+   - **Thumbnail Upload** (optional — goes to Supabase Storage)
+   - **Category**
+   - **Tags**
+   - **VIP / Featured** toggles
+6. Click **Save Video**.
+
+The panel validates and normalizes the Drive URL, then stores it in `google_drive_url`.
 
 ---
 
-## Step 4: Vercel Environment Variables
+## What the admin panel does NOT do
 
-Add these to the **admin** Vercel project (`video-za-wakubwa-tu-admin`):
-
-| Variable | Required | Value |
-|----------|----------|-------|
-| `GOOGLE_DRIVE_FOLDER_ID` | **Yes** | Folder ID from Step 3 (uploads fail without this) |
-| `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` | **Yes** | Entire JSON key file as one line |
-| `GOOGLE_DRIVE_IMPERSONATE_EMAIL` | No | Workspace user to impersonate (domain-wide delegation) when My Drive sharing is insufficient |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Admin panel URL (e.g. `https://video-za-wakubwa-tu-admin.vercel.app`) — binds Google resumable-upload CORS for browser PUT requests |
-
-**Both variables are required.** Setting only the service account JSON is not enough — the panel checks for `GOOGLE_DRIVE_FOLDER_ID` at runtime.
-
-### Formatting the JSON for Vercel
-
-Minify the JSON to a single line (no line breaks). Example structure:
-
-```json
-{"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...@....iam.gserviceaccount.com","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}
-```
-
-**Important:** Keep `\n` inside `private_key` — do not replace with real newlines in Vercel UI.
-
-### Local development (.env.local)
-
-```env
-GOOGLE_DRIVE_FOLDER_ID=your-folder-id
-GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
-```
+- Does not upload video bytes to Google Drive
+- Does not require `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`
+- Does not require `GOOGLE_DRIVE_FOLDER_ID`
 
 ---
 
-## Step 5: Deploy
+## Thumbnails and APK
 
-1. Push latest admin code to GitHub
-2. Redeploy on Vercel (env vars require redeploy)
-3. Log in to admin → **Videos** → **Add Video**
-4. Select a video file → fill title, category, thumbnail → **Save Video**
-
----
-
-## Verify Upload Works
-
-1. While logged in, open: `GET /api/drive/diagnostics`
-2. Confirm `uploadReady: true` and `folderMetadata.capabilities.canAddChildren: true`
-3. Response includes: folder `name`, `mimeType`, `owners`, `capabilities`, `permissions`, `driveId`, `shortcutDetails`, `accessibleSharedFolders`, `uploadSessionTrace`
-4. Admin → Videos → Add Video → select `.mp4` file
-2. Progress bar should show upload percentage
-3. After save, **Drive Link** column shows the Google Drive URL
-4. Open public website → video should appear and play
-
-Check status via API (while logged in):
-```
-GET /api/drive/upload/session
-→ { "configured": true, "serviceAccountEmail": "..." }
-```
-
----
-
-## Supported Formats
-
-- MP4, WebM, MOV, AVI, MKV, MPEG
-- Max file size: **5 GB** per upload (configurable in code)
+Thumbnails and APK files still use **Supabase Storage** (`media` bucket) via `/api/upload`.
 
 ---
 
@@ -124,33 +49,17 @@ GET /api/drive/upload/session
 
 | Error | Fix |
 |-------|-----|
-| `Google Drive upload is not configured` | Check GET `/api/drive/upload/session` while logged in — response includes `reason`, `folderIdSet`, `jsonParseOk` |
-| `GOOGLE_DRIVE_FOLDER_ID is not set` | Add folder ID from Drive URL to Vercel **and redeploy** |
-| `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is set but invalid JSON` | Use minified single-line JSON, or `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64`, or split `GOOGLE_DRIVE_CLIENT_EMAIL` + `GOOGLE_DRIVE_PRIVATE_KEY` |
-| `Insufficient permissions` / `404 File not found` on folder ID | Open `/api/drive/diagnostics`. If `folderMetadata` is null, compare `accessibleSharedFolders` IDs with `GOOGLE_DRIVE_FOLDER_ID`. Share folder with **exact** `clientEmail` as **Editor**. If ID is a shortcut, code resolves `shortcutDetails.targetId` automatically. |
-| Upload UI green but upload fails | Check `uploadSessionTrace` in diagnostics — Shared Drive uploads require `driveId` query param (handled automatically when `folderMetadata.driveId` is set). |
-| My Drive shared folder still 404 | Personal Gmail folders often block service-account uploads even when shared. **Move folder to a Shared Drive** or set `GOOGLE_DRIVE_IMPERSONATE_EMAIL` to the folder owner's Google Workspace email (requires domain-wide delegation). |
-| `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
-| `Failed to fetch` at 0% progress | Browser PUT to Google blocked by CORS. The server must pass your admin panel `Origin` when creating the resumable session (handled automatically). Set `NEXT_PUBLIC_APP_URL=https://your-admin.vercel.app` on Vercel if origin detection fails. |
-| Video won't play on website | File must be shared "anyone with link" — finalize step handles this |
-| `HTTP 403` / `storageQuotaExceeded` / `Service Accounts do not have storage quota` | Folder is in personal My Drive (`storageType=my_drive`). **Required fix:** move to a Shared Drive — see [GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md](./GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md) |
-
-### Shared Drive (**required** for production)
-
-Service accounts **cannot upload** to personal My Drive (`HTTP 403: no storage quota`). See **[GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md](./GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md)** for full steps.
-
-Quick checklist:
-
-1. Create a **Shared Drive** in Google Workspace
-2. Add service account as **Content manager**
-3. Create `VZW Videos` folder **inside** the Shared Drive
-4. Set `GOOGLE_DRIVE_FOLDER_ID` to that folder ID
-5. Redeploy — diagnostics must show `storageType: "shared_drive"` and `uploadReady: true`
+| `Invalid Google Drive link` | Use a file link like `https://drive.google.com/file/d/FILE_ID/view` |
+| Video won't play on website | Set Drive sharing to **Anyone with the link** |
+| Thumbnail upload fails | Check Supabase Storage bucket `media` and env vars |
 
 ---
 
-## Security Notes
+## Optional: remove old Vercel env vars
 
-- Service account JSON is **server-only** — never expose in client code or website
-- Only authenticated admins can call `/api/drive/upload/*`
-- Video bytes never pass through Vercel servers (resumable direct upload)
+If you previously set service-account upload vars, you can remove them from Vercel (they are unused):
+
+- `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON`
+- `GOOGLE_DRIVE_FOLDER_ID`
+- `GOOGLE_DRIVE_SHARED_DRIVE_ID`
+- `GOOGLE_DRIVE_IMPERSONATE_EMAIL`

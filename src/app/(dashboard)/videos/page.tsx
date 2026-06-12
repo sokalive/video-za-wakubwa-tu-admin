@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Upload, Film } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Link2 } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatNumber } from "@/lib/utils";
-import { formatBytes } from "@/lib/drive-upload";
 import type { Video } from "@/types";
 
 const emptyVideo = {
@@ -46,10 +45,8 @@ export default function VideosPage() {
   const [form, setForm] = useState(emptyVideo);
   const [tagInput, setTagInput] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadPhase, setUploadPhase] = useState("");
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [savePhase, setSavePhase] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -63,18 +60,6 @@ export default function VideosPage() {
     queryKey: ["categories"],
     queryFn: () => api.categories.list(),
   });
-
-  const { data: driveStatus } = useQuery({
-    queryKey: ["drive", "status"],
-    queryFn: () => api.drive.status(),
-    staleTime: 60_000,
-  });
-
-  const driveConfigured = driveStatus?.configured ?? false;
-  const driveFolderReady =
-    (driveStatus?.folderAccessible ?? driveStatus?.folderProbe?.ok ?? false) &&
-    !driveStatus?.folderProbe?.requiresSharedDrive;
-  const driveConfigReason = driveStatus?.reason ?? driveStatus?.folderProbe?.fixHint ?? null;
 
   const createMutation = useMutation({
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
@@ -109,9 +94,7 @@ export default function VideosPage() {
     setForm(emptyVideo);
     setTagInput("");
     setThumbnailFile(null);
-    setVideoFile(null);
-    setUploadProgress(0);
-    setUploadPhase("");
+    setSavePhase("");
   };
 
   const openCreate = () => {
@@ -131,48 +114,29 @@ export default function VideosPage() {
       isFeatured: video.isFeatured,
       tags: video.tags,
     });
-    setVideoFile(null);
-    setUploadProgress(0);
-    setUploadPhase("");
+    setSavePhase("");
     setDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const hasDriveLink = !!form.googleDriveUrl.trim();
-    const hasVideoFile = !!videoFile;
-
-    if (!editingVideo && !hasDriveLink && !hasVideoFile) {
-      alert("Upload a video file or paste a Google Drive link.");
+    if (!form.googleDriveUrl.trim()) {
+      alert("Paste a Google Drive share link for the video.");
       return;
     }
 
-    setUploading(true);
+    setSaving(true);
     try {
       const payload: Partial<Video> = { ...form };
 
-      if (videoFile) {
-        if (!driveConfigured) {
-          throw new Error("Google Drive upload is not configured on the server.");
-        }
-        if (!driveFolderReady && driveStatus?.folderProbe?.fixHint) {
-          throw new Error(driveStatus.folderProbe.fixHint);
-        }
-        setUploadPhase("Uploading video to Google Drive...");
-        setUploadProgress(0);
-        const { url } = await api.drive.uploadVideo(videoFile, setUploadProgress);
-        payload.googleDriveUrl = url;
-        setForm((prev) => ({ ...prev, googleDriveUrl: url }));
-      }
-
       if (thumbnailFile) {
-        setUploadPhase("Uploading thumbnail...");
+        setSavePhase("Uploading thumbnail...");
         const { url } = await api.upload(thumbnailFile, "thumbnails");
         payload.thumbnailUrl = url;
       }
 
-      setUploadPhase("Saving video...");
+      setSavePhase("Saving video...");
       if (editingVideo) {
         await updateMutation.mutateAsync({ id: editingVideo.id, data: payload });
       } else {
@@ -181,9 +145,8 @@ export default function VideosPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Save failed");
     } finally {
-      setUploading(false);
-      setUploadPhase("");
-      setUploadProgress(0);
+      setSaving(false);
+      setSavePhase("");
     }
   };
 
@@ -324,71 +287,18 @@ export default function VideosPage() {
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
 
-              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4">
-                <Label className="flex items-center gap-2">
-                  <Film className="h-4 w-4" /> Video File
-                </Label>
-                <Input
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.webm,.mov,.avi,.mkv"
-                  disabled={uploading || !driveConfigured || !driveFolderReady}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
-                    setVideoFile(file);
-                    if (file) setUploadProgress(0);
-                  }}
-                />
-                {videoFile && (
-                  <p className="text-xs text-gray-400">
-                    Selected: {videoFile.name} ({formatBytes(videoFile.size)})
-                  </p>
-                )}
-                {uploading && uploadPhase.startsWith("Uploading video") && (
-                  <div className="space-y-1">
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full bg-blue-500 transition-all duration-300"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-blue-400">{uploadProgress}% — {uploadPhase}</p>
-                  </div>
-                )}
-                {driveConfigured && driveFolderReady ? (
-                  <p className="text-xs text-green-400/80 flex items-center gap-1">
-                    <Upload className="h-3 w-3" />
-                    Uploads go to Google Drive folder
-                    {driveStatus?.folderName ? ` "${driveStatus.folderName}"` : ""} ({driveStatus?.folderId})
-                  </p>
-                ) : driveConfigured && !driveFolderReady ? (
-                  <div className="space-y-1 text-xs text-amber-400">
-                    <p>Folder ID at runtime: <code className="text-amber-200">{driveStatus?.folderId ?? "—"}</code></p>
-                    <p>Service account: <code className="text-amber-200">{driveStatus?.folderProbe?.serviceAccountEmail ?? driveStatus?.clientEmail ?? "—"}</code></p>
-                    <p>{driveStatus?.folderProbe?.fixHint ?? driveConfigReason ?? "Service account cannot access this folder (404). Share the folder as Editor."}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1 text-xs text-amber-400">
-                    <p>{driveConfigReason ?? "Google Drive upload not configured."}</p>
-                    {driveStatus?.jsonParseOk && driveStatus?.clientEmail && !driveStatus?.folderIdSet && (
-                      <p>Service account OK: {driveStatus.clientEmail}. Add GOOGLE_DRIVE_FOLDER_ID and redeploy.</p>
-                    )}
-                    {driveStatus?.serviceAccountJsonSet && !driveStatus?.jsonParseOk && (
-                      <p>JSON env var is set but failed to parse. Use single-line minified JSON or GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
               <div className="space-y-2">
-                <Label>Google Drive Video Link (optional if uploading file)</Label>
+                <Label className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4" /> Google Drive Share Link
+                </Label>
                 <Input
                   value={form.googleDriveUrl}
                   onChange={(e) => setForm({ ...form, googleDriveUrl: e.target.value })}
                   placeholder="https://drive.google.com/file/d/FILE_ID/view"
-                  disabled={!!videoFile && !editingVideo}
+                  required
                 />
                 <p className="text-xs text-gray-500">
-                  Upload a file above, or paste an existing Google Drive share link.
+                  Upload the video to Google Drive manually, set sharing to &quot;Anyone with the link&quot;, then paste the link here.
                 </p>
               </div>
 
@@ -427,12 +337,8 @@ export default function VideosPage() {
                 <Label>Featured</Label>
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
               </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || uploading}>
-                {uploading
-                  ? uploadPhase || "Saving..."
-                  : editingVideo
-                    ? "Update Video"
-                    : "Save Video"}
+              <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || saving}>
+                {saving ? savePhase || "Saving..." : editingVideo ? "Update Video" : "Save Video"}
               </Button>
             </form>
           </DialogContent>
