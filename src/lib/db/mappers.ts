@@ -11,6 +11,8 @@ import type {
   SiteSettings,
   DashboardStats,
   AnalyticsData,
+  VideoReport,
+  VideoLikeStat,
 } from "@/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -171,6 +173,30 @@ export function mapAdmin(row: Record<string, any>): Admin {
   };
 }
 
+export function mapVideoReport(row: Record<string, any>): VideoReport {
+  const video = row.videos as Record<string, unknown> | null | undefined;
+  return {
+    id: row.id,
+    videoId: row.video_id,
+    videoTitle: (video?.title as string) ?? row.video_id,
+    reason: row.reason,
+    details: row.details ?? "",
+    deviceId: row.device_id ?? undefined,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapVideoLikeStat(row: Record<string, any>): VideoLikeStat {
+  return {
+    id: row.id,
+    title: row.title,
+    likesCount: row.likes_count ?? 0,
+    views: row.views ?? 0,
+    categoryName: row.category_name ?? "",
+  };
+}
+
 export function mapActivityLog(row: Record<string, any>): ActivityLog {
   return {
     id: row.id,
@@ -232,7 +258,7 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
-  const [videosRes, categoriesRes, paymentsRes] = await Promise.all([
+  const [videosRes, categoriesRes, paymentsRes, likedRes] = await Promise.all([
     db.from("videos").select("id, title, views, category_id, created_at").order("views", { ascending: false }),
     db.from("categories").select("id, name"),
     db
@@ -240,9 +266,15 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
       .select("amount, status, created_at")
       .eq("status", "completed")
       .gte("created_at", thirtyDaysAgo.toISOString()),
+    db
+      .from("videos")
+      .select("id, title, views, likes_count")
+      .order("likes_count", { ascending: false })
+      .limit(20),
   ]);
 
   const videos = videosRes.data ?? [];
+  const likedVideos = likedRes.data ?? [];
   const categories = categoriesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
 
@@ -304,5 +336,11 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
       }))
       .sort((a, b) => b.views - a.views)
       .slice(0, 5),
+    topLikedVideos: likedVideos.map((video) => ({
+      id: video.id as string,
+      title: video.title as string,
+      likesCount: (video.likes_count as number) ?? 0,
+      views: (video.views as number) ?? 0,
+    })),
   };
 }

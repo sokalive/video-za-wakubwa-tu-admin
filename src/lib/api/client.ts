@@ -129,6 +129,22 @@ export const api = {
   activityLogs: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").ActivityLog[] }>("/activity-logs"),
   },
+  reports: {
+    list: () => fetchApi<{ success: boolean; data: import("@/types").VideoReport[] }>("/reports"),
+    dismiss: (id: string) =>
+      fetchApi<{ success: boolean }>(`/reports/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "dismiss" }),
+      }),
+    delete: (id: string) =>
+      fetchApi<{ success: boolean }>(`/reports/${id}`, { method: "DELETE" }),
+  },
+  likesAnalytics: {
+    list: () =>
+      fetchApi<{ success: boolean; data: import("@/types").VideoLikeStat[] }>(
+        "/likes-analytics"
+      ),
+  },
   r2: {
     status: () =>
       fetchApi<{

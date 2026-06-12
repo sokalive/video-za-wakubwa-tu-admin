@@ -34,6 +34,7 @@ export default function AnalyticsPage() {
             <TabsTrigger value="monthly">Monthly Views</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="top">Top Content</TabsTrigger>
+            <TabsTrigger value="likes">Most Liked</TabsTrigger>
           </TabsList>
 
           <TabsContent value="daily" className="mt-6">
@@ -71,6 +72,20 @@ export default function AnalyticsPage() {
                 secondaryLabel="Videos"
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="likes" className="mt-6">
+            <TopList
+              title="Most Liked Videos"
+              items={(analytics.topLikedVideos ?? []).map((v) => ({
+                id: v.id,
+                name: v.title,
+                primary: v.likesCount,
+                secondary: v.views,
+              }))}
+              primaryLabel="Likes"
+              secondaryLabel="Views"
+            />
           </TabsContent>
         </Tabs>
       ) : null}

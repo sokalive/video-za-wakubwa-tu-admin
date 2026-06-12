@@ -129,6 +129,26 @@ export interface AnalyticsData {
   revenueChart: { date: string; revenue: number }[];
   topVideos: { id: string; title: string; views: number; revenue: number }[];
   topCategories: { id: string; name: string; views: number; videoCount: number }[];
+  topLikedVideos: { id: string; title: string; likesCount: number; views: number }[];
+}
+
+export interface VideoReport {
+  id: string;
+  videoId: string;
+  videoTitle: string;
+  reason: string;
+  details: string;
+  deviceId?: string;
+  status: "pending" | "reviewed" | "dismissed";
+  createdAt: string;
+}
+
+export interface VideoLikeStat {
+  id: string;
+  title: string;
+  likesCount: number;
+  views: number;
+  categoryName: string;
 }
 
 export interface SiteSettings {

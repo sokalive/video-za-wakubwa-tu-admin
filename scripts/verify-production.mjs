@@ -65,7 +65,16 @@ async function main() {
 
   // 2. Database tables
   console.log("\n2. Database Tables");
-  const tables = ["admins", "categories", "videos", "vip_plans", "apk_releases", "site_settings"];
+  const tables = [
+    "admins",
+    "categories",
+    "videos",
+    "vip_plans",
+    "apk_releases",
+    "site_settings",
+    "video_likes",
+    "video_reports",
+  ];
   for (const table of tables) {
     const { error } = await adminDb.from(table).select("*").limit(1);
     if (error) fail(`Table: ${table}`, error.message);
@@ -85,8 +94,14 @@ async function main() {
   if (!cats?.length) warn("Categories", "empty — run npm run seed or add via admin");
   else pass(`Categories (${cats.length} found)`);
 
-  // 5. Videos with Google Drive links
-  console.log("\n5. Videos (Google Drive)");
+  // 5. Player features columns
+  console.log("\n5. Player Features (likes/reports)");
+  const { error: likesColErr } = await adminDb.from("videos").select("likes_count, video_qualities").limit(1);
+  if (likesColErr) fail("videos.likes_count / video_qualities", likesColErr.message);
+  else pass("videos.likes_count and video_qualities columns");
+
+  // 6. Videos with Google Drive links
+  console.log("\n6. Videos (Google Drive)");
   const { data: videos } = await adminDb.from("videos").select("id, title, google_drive_url, thumbnail_url, is_vip, published");
   if (!videos?.length) warn("Videos", "empty — add via admin or run npm run seed:test-video");
   else {
@@ -98,8 +113,8 @@ async function main() {
     pass(`Published videos (${published.length})`);
   }
 
-  // 6. Storage bucket
-  console.log("\n6. Storage Bucket");
+  // 7. Storage bucket
+  console.log("\n7. Storage Bucket");
   const { data: buckets, error: bucketErr } = await adminDb.storage.listBuckets();
   if (bucketErr) fail("Storage buckets", bucketErr.message);
   else {
@@ -109,8 +124,8 @@ async function main() {
     else pass("media bucket (public)");
   }
 
-  // 7. Website read path (anon key)
-  console.log("\n7. Website Read Path (anon key)");
+  // 8. Website read path (anon key)
+  console.log("\n8. Website Read Path (anon key)");
   if (anonKey) {
     const publicDb = createClient(url, anonKey, { auth: { persistSession: false } });
     const { data: pubVideos, error: pubErr } = await publicDb.from("videos").select("id, title").eq("published", true).limit(5);
@@ -119,8 +134,8 @@ async function main() {
     else pass(`Anon read videos (${pubVideos.length} visible)`);
   }
 
-  // 8. Live website API
-  console.log("\n8. Live Website API");
+  // 9. Live website API
+  console.log("\n9. Live Website API");
   try {
     const res = await fetch(`${WEBSITE_URL}/api/videos?limit=3`);
     const json = await res.json();
@@ -131,8 +146,8 @@ async function main() {
     fail("Website /api/videos", e.message);
   }
 
-  // 9. Admin login page
-  console.log("\n9. Admin Panel");
+  // 10. Admin login page
+  console.log("\n10. Admin Panel");
   try {
     const res = await fetch(`${ADMIN_URL}/login`);
     if (res.ok) pass("Admin login page reachable");

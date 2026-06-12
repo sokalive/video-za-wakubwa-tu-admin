@@ -18,6 +18,8 @@ import {
   mapActivityLog,
   mapSettings,
   mapSettingsToDb,
+  mapVideoReport,
+  mapVideoLikeStat,
   computeDashboardStats,
   computeAnalytics,
 } from "./mappers";
@@ -32,6 +34,8 @@ import type {
   Advertisement,
   ActivityLog,
   SiteSettings,
+  VideoReport,
+  VideoLikeStat,
 } from "@/types";
 
 // ─── Auth ───────────────────────────────────────────────────
@@ -87,6 +91,46 @@ export async function logActivity(
 export async function listActivityLogs(): Promise<ActivityLog[]> {
   const { data } = await getSupabaseAdmin().from("activity_logs").select("*").order("created_at", { ascending: false }).limit(100);
   return (data ?? []).map(mapActivityLog);
+}
+
+export async function listVideoReports(): Promise<VideoReport[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("video_reports")
+    .select("*, videos(title)")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapVideoReport);
+}
+
+export async function dismissVideoReport(id: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("video_reports")
+    .update({ status: "dismissed" })
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteVideoReport(id: string): Promise<void> {
+  const { error } = await getSupabaseAdmin()
+    .from("video_reports")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function listVideoLikeStats(limit = 50): Promise<VideoLikeStat[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("videos")
+    .select("id, title, likes_count, views, category_name")
+    .order("likes_count", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapVideoLikeStat);
 }
 
 // ─── Videos ─────────────────────────────────────────────────
