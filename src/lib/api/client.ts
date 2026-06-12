@@ -36,9 +36,13 @@ export const api = {
   },
   videos: {
     list: (params?: { search?: string; category?: string; isVip?: string }) => {
-      const query = new URLSearchParams(params as Record<string, string>).toString();
+      const query = new URLSearchParams();
+      if (params?.search) query.set("search", params.search);
+      if (params?.category) query.set("category", params.category);
+      if (params?.isVip) query.set("isVip", params.isVip);
+      const qs = query.toString();
       return fetchApi<{ success: boolean; data: import("@/types").Video[] }>(
-        `/videos${query ? `?${query}` : ""}`
+        `/videos${qs ? `?${qs}` : ""}`
       );
     },
     create: (video: Partial<import("@/types").Video>) =>

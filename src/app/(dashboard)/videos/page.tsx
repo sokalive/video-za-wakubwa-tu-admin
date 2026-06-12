@@ -54,7 +54,7 @@ export default function VideosPage() {
   const [savePhase, setSavePhase] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["videos", search, filterVip],
     queryFn: () => api.videos.list({
       search: search || undefined,
@@ -134,6 +134,7 @@ export default function VideosPage() {
       tags: video.tags,
     });
     setVideoFile(null);
+    setThumbnailFile(null);
     setSavePhase("");
     setUploadProgress(0);
     setDialogOpen(true);
@@ -202,6 +203,10 @@ export default function VideosPage() {
     }
   };
 
+  const removeTag = (tag: string) => {
+    setForm({ ...form, tags: form.tags.filter((t) => t !== tag) });
+  };
+
   const videos = data?.data || [];
   const categories = categoriesData?.data || [];
 
@@ -245,6 +250,14 @@ export default function VideosPage() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full" />
                 ))}
+              </div>
+            ) : isError ? (
+              <div className="p-6 text-sm text-red-400">
+                Failed to load videos: {error instanceof Error ? error.message : "Unknown error"}
+              </div>
+            ) : videos.length === 0 ? (
+              <div className="p-6 text-sm text-gray-400">
+                No videos found. Click &quot;Add Video&quot; to upload your first video.
               </div>
             ) : (
               <Table>
@@ -343,12 +356,14 @@ export default function VideosPage() {
 
               <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4">
                 <Label className="flex items-center gap-2">
-                  <Film className="h-4 w-4" /> Video File (Cloudflare R2)
+                  <Film className="h-4 w-4" />
+                  {editingVideo ? "Replace Video File (optional)" : "Video File (Cloudflare R2)"}
                 </Label>
                 <Input
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.webm,.mov,.avi,.mkv"
                   disabled={saving || !r2Configured}
+                  required={!editingVideo}
                   onChange={(e) => {
                     setVideoFile(e.target.files?.[0] ?? null);
                     if (e.target.files?.[0]) setUploadProgress(0);
@@ -410,7 +425,15 @@ export default function VideosPage() {
                 </div>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {form.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="inline-flex"
+                      title="Remove tag"
+                    >
+                      <Badge variant="secondary">{tag} ×</Badge>
+                    </button>
                   ))}
                 </div>
               </div>

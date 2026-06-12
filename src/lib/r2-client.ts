@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sanitizeEnv } from "@/lib/env";
 
@@ -108,6 +108,24 @@ export function isAllowedVideoFile(fileName: string, mimeType: string): boolean 
     ALLOWED_VIDEO_MIME_TYPES.includes(mimeType as (typeof ALLOWED_VIDEO_MIME_TYPES)[number]) ||
     mimeType.startsWith("video/");
   return extOk || mimeOk;
+}
+
+export async function deleteR2Object(objectKey: string): Promise<void> {
+  const key = objectKey?.trim();
+  if (!key) return;
+
+  const config = getR2Config();
+  if (!config) {
+    throw new Error(getR2Status().reason ?? "R2 is not configured.");
+  }
+
+  const client = getS3Client(config);
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: config.bucketName,
+      Key: key,
+    })
+  );
 }
 
 export async function createR2UploadSession(

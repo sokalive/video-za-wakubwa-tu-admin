@@ -31,7 +31,7 @@ export function mapVideo(row: Record<string, any>): Video {
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
     isFeatured: row.is_featured ?? false,
-    tags: row.tags ?? [],
+    tags: Array.isArray(row.tags) ? row.tags : [],
     views: row.views ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

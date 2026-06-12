@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { normalizeGoogleDriveUrl, isValidGoogleDriveUrl } from "@/lib/google-drive";
+import { deleteR2Object } from "@/lib/r2-client";
 import { getSupabaseAdmin, STORAGE_BUCKET } from "./client";
 import { supabaseRest } from "./rest";
 import {
@@ -105,10 +106,15 @@ async function syncCategoryVideoCounts(db: ReturnType<typeof getSupabaseAdmin>, 
 }
 
 export async function listVideos(filters?: { search?: string; category?: string; isVip?: boolean }): Promise<Video[]> {
-  let query = getSupabaseAdmin().from("videos").select("*").order("created_at", { ascending: false });
-  if (filters?.category) query = query.eq("category_id", filters.category);
-  if (filters?.isVip !== undefined) query = query.eq("is_vip", filters.isVip);
-  const { data } = await query;
+  const params = new URLSearchParams();
+  params.set("select", "*");
+  params.set("order", "created_at.desc");
+  if (filters?.category) params.set("category_id", `eq.${filters.category}`);
+  if (filters?.isVip !== undefined) params.set("is_vip", `eq.${filters.isVip}`);
+
+  const { data, error } = await supabaseRest<Record<string, unknown>[]>(`videos?${params.toString()}`);
+  if (error) throw new Error(`Failed to load videos: ${error}`);
+
   let videos = (data ?? []).map(mapVideo);
   if (filters?.search) {
     const s = filters.search.toLowerCase();
@@ -174,16 +180,33 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     views: 0,
     published: true,
   };
-  const { data, error } = await db.from("videos").insert(row).select().single();
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(row),
+  });
+  if (error) throw new Error(error);
+  const created = data?.[0];
+  if (!created) throw new Error("Failed to create video record.");
+
   if (body.categoryId) await syncCategoryVideoCount(db, body.categoryId);
   await logActivity(adminId, adminName, "upload", "video", `Uploaded video: ${body.title}`, id);
-  return mapVideo(data);
+  return mapVideo(created);
 }
 
-export async function updateVideo(id: string, body: Partial<Video>): Promise<Video> {
+export async function updateVideo(
+  id: string,
+  body: Partial<Video>,
+  adminId?: string,
+  adminName?: string
+): Promise<Video> {
   const db = getSupabaseAdmin();
-  const { data: existing } = await db.from("videos").select("category_id").eq("id", id).single();
+  const { data: existingRows, error: existingError } = await supabaseRest<Record<string, unknown>[]>(
+    `videos?select=category_id,r2_object_key,video_storage&id=eq.${encodeURIComponent(id)}&limit=1`
+  );
+  if (existingError) throw new Error(existingError);
+  const existing = existingRows?.[0];
+
   const updates = mapVideoToDb(body);
 
   if (body.videoUrl !== undefined) {
@@ -205,20 +228,73 @@ export async function updateVideo(id: string, body: Partial<Video>): Promise<Vid
     const { data: cat } = await db.from("categories").select("name").eq("id", body.categoryId).single();
     if (cat) updates.category_name = cat.name;
   }
-  const { data, error } = await db.from("videos").update(updates).eq("id", id).select().single();
-  if (error) throw new Error(error.message);
+
+  const previousR2Key = (existing?.r2_object_key as string) ?? "";
+  const nextR2Key = body.r2ObjectKey ?? previousR2Key;
+
+  const { data: updatedRows, error } = await supabaseRest<Record<string, unknown>[]>(
+    `videos?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(updates),
+    }
+  );
+  if (error) throw new Error(error);
+  const updated = updatedRows?.[0];
+  if (!updated) throw new Error("Video not found.");
+
+  if (
+    previousR2Key &&
+    nextR2Key &&
+    previousR2Key !== nextR2Key &&
+    (existing?.video_storage === "r2" || body.videoStorage === "r2")
+  ) {
+    try {
+      await deleteR2Object(previousR2Key);
+    } catch {
+      // DB record updated; orphaned object can be cleaned manually
+    }
+  }
+
   const categoryIds = [existing?.category_id as string, body.categoryId].filter(Boolean) as string[];
   await syncCategoryVideoCounts(db, categoryIds);
-  return mapVideo(data);
+
+  if (adminId && adminName) {
+    await logActivity(adminId, adminName, "update", "video", `Updated video: ${updated.title as string}`, id);
+  }
+
+  return mapVideo(updated);
 }
 
 export async function deleteVideo(id: string, adminId: string, adminName: string): Promise<void> {
   const db = getSupabaseAdmin();
-  const { data: video } = await db.from("videos").select("title, category_id").eq("id", id).single();
-  const { error } = await db.from("videos").delete().eq("id", id);
-  if (error) throw new Error(error.message);
-  if (video?.category_id) await syncCategoryVideoCount(db, video.category_id as string);
-  await logActivity(adminId, adminName, "delete", "video", `Deleted video: ${video?.title ?? id}`, id);
+
+  const { data: rows, error: fetchError } = await supabaseRest<Record<string, unknown>[]>(
+    `videos?select=title,category_id,r2_object_key,video_storage&id=eq.${encodeURIComponent(id)}&limit=1`
+  );
+  if (fetchError) throw new Error(fetchError);
+  const video = rows?.[0];
+  if (!video) throw new Error("Video not found.");
+
+  const r2Key = (video.r2_object_key as string) ?? "";
+  if (r2Key && video.video_storage === "r2") {
+    try {
+      await deleteR2Object(r2Key);
+    } catch (err) {
+      throw new Error(
+        `Failed to delete R2 object: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+    }
+  }
+
+  const { error } = await supabaseRest(`videos?id=eq.${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (error) throw new Error(error);
+
+  if (video.category_id) await syncCategoryVideoCount(db, video.category_id as string);
+  await logActivity(adminId, adminName, "delete", "video", `Deleted video: ${video.title ?? id}`, id);
 }
 
 // ─── Categories ─────────────────────────────────────────────
