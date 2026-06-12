@@ -71,7 +71,7 @@ export default function VideosPage() {
   });
 
   const driveConfigured = driveStatus?.configured ?? false;
-  const driveFolderReady = driveStatus?.folderAccessible ?? false;
+  const driveFolderReady = driveStatus?.folderAccessible ?? driveStatus?.folderProbe?.ok ?? false;
   const driveConfigReason = driveStatus?.reason ?? driveStatus?.folderProbe?.fixHint ?? null;
 
   const createMutation = useMutation({

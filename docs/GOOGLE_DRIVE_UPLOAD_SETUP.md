@@ -62,6 +62,7 @@ Add these to the **admin** Vercel project (`video-za-wakubwa-tu-admin`):
 |----------|----------|-------|
 | `GOOGLE_DRIVE_FOLDER_ID` | **Yes** | Folder ID from Step 3 (uploads fail without this) |
 | `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` | **Yes** | Entire JSON key file as one line |
+| `GOOGLE_DRIVE_IMPERSONATE_EMAIL` | No | Workspace user to impersonate (domain-wide delegation) when My Drive sharing is insufficient |
 
 **Both variables are required.** Setting only the service account JSON is not enough — the panel checks for `GOOGLE_DRIVE_FOLDER_ID` at runtime.
 
@@ -96,8 +97,9 @@ GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ## Verify Upload Works
 
 1. While logged in, open: `GET /api/drive/diagnostics`
-2. Confirm `uploadReady: true` and `folderProbe.ok: true`
-3. Admin → Videos → Add Video → select `.mp4` file
+2. Confirm `uploadReady: true` and `folderMetadata.capabilities.canAddChildren: true`
+3. Response includes: folder `name`, `mimeType`, `owners`, `capabilities`, `permissions`, `driveId`, `shortcutDetails`, `accessibleSharedFolders`, `uploadSessionTrace`
+4. Admin → Videos → Add Video → select `.mp4` file
 2. Progress bar should show upload percentage
 3. After save, **Drive Link** column shows the Google Drive URL
 4. Open public website → video should appear and play
@@ -124,8 +126,9 @@ GET /api/drive/upload/session
 | `Google Drive upload is not configured` | Check GET `/api/drive/upload/session` while logged in — response includes `reason`, `folderIdSet`, `jsonParseOk` |
 | `GOOGLE_DRIVE_FOLDER_ID is not set` | Add folder ID from Drive URL to Vercel **and redeploy** |
 | `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is set but invalid JSON` | Use minified single-line JSON, or `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64`, or split `GOOGLE_DRIVE_CLIENT_EMAIL` + `GOOGLE_DRIVE_PRIVATE_KEY` |
-| `Insufficient permissions` / `404 File not found` on folder ID | Service account cannot see the folder. Share folder with **exact** `clientEmail` from GET `/api/drive/diagnostics` as **Editor**. For Shared Drives, add service account as **Content manager** on the drive. |
-| Upload UI green but upload fails | Open `/api/drive/diagnostics` while logged in — check `folderProbe.ok` and `fixHint` |
+| `Insufficient permissions` / `404 File not found` on folder ID | Open `/api/drive/diagnostics`. If `folderMetadata` is null, compare `accessibleSharedFolders` IDs with `GOOGLE_DRIVE_FOLDER_ID`. Share folder with **exact** `clientEmail` as **Editor**. If ID is a shortcut, code resolves `shortcutDetails.targetId` automatically. |
+| Upload UI green but upload fails | Check `uploadSessionTrace` in diagnostics — Shared Drive uploads require `driveId` query param (handled automatically when `folderMetadata.driveId` is set). |
+| My Drive shared folder still 404 | Personal Gmail folders often block service-account uploads even when shared. **Move folder to a Shared Drive** or set `GOOGLE_DRIVE_IMPERSONATE_EMAIL` to the folder owner's Google Workspace email (requires domain-wide delegation). |
 | `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
 | Upload fails at 0% (CORS) | Ensure Drive API is enabled; try different browser |
 | Video won't play on website | File must be shared "anyone with link" — finalize step handles this |
