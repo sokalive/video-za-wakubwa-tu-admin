@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth/session";
 import { sanitizeEnv } from "@/lib/env";
 import { isDbConfigured } from "@/lib/db/client";
 import {
@@ -6,6 +7,7 @@ import {
   probeVipTrialColumns,
   VIP_TRIAL_MIGRATION_FILE,
 } from "@/lib/db/vip-trial-migration";
+import { buildSupabaseDatabaseUrl } from "@/lib/db/supabase-database-url";
 
 async function runMigrationWithPostgres(databaseUrl: string): Promise<void> {
   const postgres = (await import("postgres")).default;
@@ -47,7 +49,11 @@ export async function POST(request: Request) {
   }
 
   const setupToken = request.headers.get("x-setup-token");
-  if (setupToken !== sanitizeEnv(process.env.JWT_SECRET)) {
+  const session = await getSession();
+  const authorized =
+    (setupToken && setupToken === sanitizeEnv(process.env.JWT_SECRET)) || !!session;
+
+  if (!authorized) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
   }
 
@@ -56,12 +62,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, alreadyApplied: true, vipTrialColumnsReady: true });
   }
 
-  const databaseUrl =
-    sanitizeEnv(process.env.SUPABASE_DATABASE_URL) || sanitizeEnv(process.env.DATABASE_URL);
+  const databaseUrl = buildSupabaseDatabaseUrl();
 
   if (!databaseUrl) {
     return NextResponse.json(
-      { success: false, error: "SUPABASE_DATABASE_URL not set", sql: getVipTrialMigrationSql() },
+      {
+        success: false,
+        error:
+          "Set SUPABASE_DATABASE_URL or SUPABASE_DB_PASSWORD on Vercel, redeploy, and POST again. Or run SQL manually.",
+        sql: getVipTrialMigrationSql(),
+      },
       { status: 503 }
     );
   }

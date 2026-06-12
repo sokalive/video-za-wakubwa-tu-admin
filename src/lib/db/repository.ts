@@ -577,20 +577,32 @@ export async function getSettings(): Promise<SiteSettings> {
 }
 
 export async function getVipTrialSettings(): Promise<import("@/types").VipTrialSettings> {
-  const settings = await getSettings();
-  return settings.vipTrial;
+  const { data, error } = await supabaseRest<Record<string, unknown>[]>(
+    "site_settings?select=vip_trial_enabled,vip_trial_duration_value,vip_trial_duration_unit&id=eq.main&limit=1"
+  );
+  if (error) {
+    if (/vip_trial|schema cache/i.test(error)) {
+      return { enabled: false, durationValue: 5, durationUnit: "minutes" };
+    }
+    throw new Error(error);
+  }
+  const row = data?.[0];
+  if (!row) return { enabled: false, durationValue: 5, durationUnit: "minutes" };
+  return mapVipTrialSettings(row);
 }
 
 export async function updateVipTrialSettings(
   body: Partial<import("@/types").VipTrialSettings>
 ): Promise<import("@/types").VipTrialSettings> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("site_settings")
-    .upsert({ id: "main", ...mapVipTrialSettingsToDb(body) })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return mapVipTrialSettings(data);
+  const { data: rows, error } = await supabaseRest<Record<string, unknown>[]>("site_settings", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({ id: "main", ...mapVipTrialSettingsToDb(body) }),
+  });
+  if (error) throw new Error(error);
+  const row = rows?.[0];
+  if (!row) throw new Error("Failed to save trial settings.");
+  return mapVipTrialSettings(row);
 }
 
 export async function updateSettings(body: Partial<SiteSettings>): Promise<SiteSettings> {

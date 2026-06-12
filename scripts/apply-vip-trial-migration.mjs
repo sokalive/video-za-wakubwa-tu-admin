@@ -8,9 +8,10 @@ import { fileURLToPath } from "url";
 import postgres from "postgres";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const envPath = join(__dirname, "..", ".env.local");
+const envFiles = [join(__dirname, "..", ".env.production.local"), join(__dirname, "..", ".env.local")];
 
-if (existsSync(envPath)) {
+for (const envPath of envFiles) {
+  if (!existsSync(envPath)) continue;
   for (const line of readFileSync(envPath, "utf8").split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
@@ -25,9 +26,26 @@ if (existsSync(envPath)) {
   }
 }
 
-const databaseUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+function buildSupabaseDatabaseUrl() {
+  const explicit = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+  if (explicit) return explicit;
+
+  const password = process.env.SUPABASE_DB_PASSWORD;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!password || !supabaseUrl) return null;
+
+  try {
+    const ref = new URL(supabaseUrl).hostname.split(".")[0];
+    const region = process.env.SUPABASE_DB_REGION || "ap-southeast-1";
+    return `postgresql://postgres.${ref}:${encodeURIComponent(password)}@aws-0-${region}.pooler.supabase.com:5432/postgres`;
+  } catch {
+    return null;
+  }
+}
+
+const databaseUrl = buildSupabaseDatabaseUrl();
 if (!databaseUrl) {
-  console.error("Missing SUPABASE_DATABASE_URL or DATABASE_URL");
+  console.error("Missing SUPABASE_DATABASE_URL, DATABASE_URL, or SUPABASE_DB_PASSWORD + NEXT_PUBLIC_SUPABASE_URL");
   process.exit(1);
 }
 
