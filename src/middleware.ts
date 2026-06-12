@@ -8,6 +8,7 @@ const publicPaths = [
   "/api/setup/seed-admin",
   "/api/setup/health",
   "/api/setup/migrate-r2",
+  "/api/setup/migrate-analytics",
 ];
 
 export async function middleware(request: NextRequest) {
