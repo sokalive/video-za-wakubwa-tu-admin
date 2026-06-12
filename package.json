@@ -13,7 +13,8 @@
     "verify": "node scripts/verify-production.mjs",
     "migrate:r2": "node scripts/apply-r2-migration.mjs",
     "migrate:analytics": "node scripts/apply-analytics-migration.mjs",
-    "seed:vip-plans": "node scripts/seed-vip-plans.mjs"
+    "seed:vip-plans": "node scripts/seed-vip-plans.mjs",
+    "setup:production-vip": "node scripts/production-vip-setup.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1067.0",

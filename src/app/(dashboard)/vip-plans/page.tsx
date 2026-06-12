@@ -31,6 +31,16 @@ export default function VipPlansPage() {
     queryFn: () => api.vipPlans.list(),
   });
 
+  const seedMutation = useMutation({
+    mutationFn: () =>
+      fetch("/api/vip-plans/seed", { method: "POST" }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Seed failed");
+        return data;
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vip-plans"] }),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<VipPlan> }) =>
       api.vipPlans.update(id, data),
@@ -51,10 +61,19 @@ export default function VipPlansPage() {
           ))
         ) : plans.length === 0 ? (
           <Card className="md:col-span-3">
-            <CardContent className="p-6 text-sm text-gray-400">
-              No VIP plans found. Run{" "}
-              <code className="text-gray-300">npm run seed:vip-plans</code> or{" "}
-              <code className="text-gray-300">GET /api/setup/seed-vip-plans</code> on production.
+            <CardContent className="p-6 space-y-4 text-sm text-gray-400">
+              <p>No VIP plans found. Seed the default 1 Day / 1 Week / 1 Month plans:</p>
+              <Button
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+              >
+                {seedMutation.isPending ? "Seeding..." : "Seed Default VIP Plans"}
+              </Button>
+              {seedMutation.isError && (
+                <p className="text-red-400">
+                  {seedMutation.error instanceof Error ? seedMutation.error.message : "Seed failed"}
+                </p>
+              )}
             </CardContent>
           </Card>
         ) : (
