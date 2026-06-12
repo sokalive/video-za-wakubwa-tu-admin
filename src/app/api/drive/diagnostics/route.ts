@@ -5,7 +5,7 @@ import {
   probeDriveFolder,
 } from "@/lib/google-drive-client";
 
-/** Live diagnostics: folder ID at runtime, service account, and Drive API folder lookup. */
+/** Live diagnostics with full Drive API request/response traces. */
 export async function GET() {
   const session = await getSession();
   if (!session) {
@@ -31,6 +31,8 @@ export async function GET() {
       config,
       folderProbe,
       uploadReady: folderProbe.ok,
+      filesGetRequest: folderProbe.apiTrace,
+      uploadSessionRequest: folderProbe.uploadSessionTrace,
     });
   } catch (err) {
     return NextResponse.json({
