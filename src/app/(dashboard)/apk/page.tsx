@@ -60,7 +60,7 @@ export default function ApkPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {apk && (
+            {apk ? (
               <>
                 <div className="flex items-center justify-between">
                   <div>
@@ -91,6 +91,11 @@ export default function ApkPage() {
                   </a>
                 </Button>
               </>
+            ) : (
+              <div className="rounded-lg border border-dashed border-white/10 p-8 text-center text-gray-400">
+                <p className="font-medium text-white mb-1">No APK uploaded yet</p>
+                <p className="text-sm">Upload an APK file using the form on the right. It will appear here and on the website download button.</p>
+              </div>
             )}
           </CardContent>
         </Card>
