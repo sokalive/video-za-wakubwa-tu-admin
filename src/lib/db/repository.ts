@@ -130,11 +130,29 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     categoryName = cat?.name ?? categoryName;
   }
 
-  const driveInput = body.googleDriveUrl ?? "";
-  if (!isValidGoogleDriveUrl(driveInput)) {
-    throw new Error("Invalid Google Drive link. Use a share link like https://drive.google.com/file/d/FILE_ID/view");
+  const videoUrl = (body.videoUrl ?? "").trim();
+  const r2ObjectKey = (body.r2ObjectKey ?? "").trim();
+  const driveInput = (body.googleDriveUrl ?? "").trim();
+
+  if (!videoUrl && !driveInput) {
+    throw new Error("Upload a video file to R2 or provide a legacy Google Drive link.");
   }
-  const googleDriveUrl = normalizeGoogleDriveUrl(driveInput)!;
+
+  let storedVideoUrl = "";
+  let storedDriveUrl = "";
+  let videoStorage: "r2" | "google_drive" = "google_drive";
+  let storedR2Key = "";
+
+  if (videoUrl) {
+    storedVideoUrl = videoUrl;
+    storedR2Key = r2ObjectKey;
+    videoStorage = "r2";
+  } else if (isValidGoogleDriveUrl(driveInput)) {
+    storedDriveUrl = normalizeGoogleDriveUrl(driveInput)!;
+    videoStorage = "google_drive";
+  } else {
+    throw new Error("Invalid video source. Upload a file to R2.");
+  }
 
   const id = `vid-${Date.now()}`;
   const row = {
@@ -144,7 +162,10 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     category_id: body.categoryId,
     category_name: categoryName,
     thumbnail_url: body.thumbnailUrl ?? "",
-    google_drive_url: googleDriveUrl,
+    video_url: storedVideoUrl,
+    r2_object_key: storedR2Key,
+    video_storage: videoStorage,
+    google_drive_url: storedDriveUrl,
     duration: body.duration ?? "0:00",
     resolution: body.resolution ?? "1080p",
     is_vip: body.isVip ?? false,
@@ -165,11 +186,20 @@ export async function updateVideo(id: string, body: Partial<Video>): Promise<Vid
   const { data: existing } = await db.from("videos").select("category_id").eq("id", id).single();
   const updates = mapVideoToDb(body);
 
+  if (body.videoUrl !== undefined) {
+    updates.video_url = body.videoUrl;
+    updates.video_storage = body.videoStorage ?? "r2";
+  }
+  if (body.r2ObjectKey !== undefined) {
+    updates.r2_object_key = body.r2ObjectKey;
+  }
   if (body.googleDriveUrl !== undefined) {
-    if (!isValidGoogleDriveUrl(body.googleDriveUrl)) {
+    if (body.googleDriveUrl && !isValidGoogleDriveUrl(body.googleDriveUrl)) {
       throw new Error("Invalid Google Drive link");
     }
-    updates.google_drive_url = normalizeGoogleDriveUrl(body.googleDriveUrl);
+    updates.google_drive_url = body.googleDriveUrl
+      ? normalizeGoogleDriveUrl(body.googleDriveUrl)
+      : "";
   }
   if (body.categoryId) {
     const { data: cat } = await db.from("categories").select("name").eq("id", body.categoryId).single();

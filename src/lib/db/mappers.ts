@@ -23,7 +23,10 @@ export function mapVideo(row: Record<string, any>): Video {
     categoryId: row.category_id ?? "",
     categoryName: row.category_name ?? "",
     thumbnailUrl: row.thumbnail_url ?? "",
-    googleDriveUrl: row.google_drive_url ?? row.video_url ?? "",
+    videoUrl: row.video_url ?? "",
+    r2ObjectKey: row.r2_object_key ?? "",
+    videoStorage: row.video_storage === "r2" ? "r2" : "google_drive",
+    googleDriveUrl: row.google_drive_url ?? "",
     duration: row.duration ?? "0:00",
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
@@ -42,6 +45,9 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.categoryId !== undefined) data.category_id = video.categoryId;
   if (video.categoryName !== undefined) data.category_name = video.categoryName;
   if (video.thumbnailUrl !== undefined) data.thumbnail_url = video.thumbnailUrl;
+  if (video.videoUrl !== undefined) data.video_url = video.videoUrl;
+  if (video.r2ObjectKey !== undefined) data.r2_object_key = video.r2ObjectKey;
+  if (video.videoStorage !== undefined) data.video_storage = video.videoStorage;
   if (video.googleDriveUrl !== undefined) data.google_drive_url = video.googleDriveUrl;
   if (video.duration !== undefined) data.duration = video.duration;
   if (video.resolution !== undefined) data.resolution = video.resolution;

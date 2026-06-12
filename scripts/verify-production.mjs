@@ -50,8 +50,11 @@ async function main() {
   if (!process.env.JWT_SECRET) warn("JWT_SECRET", "not set — using default (not safe for production)");
   else pass("JWT_SECRET");
 
-  console.log("\n1b. Google Drive");
-  pass("Share-link workflow — no GOOGLE_DRIVE env vars required");
+  console.log("\n1b. Cloudflare R2");
+  const r2Vars = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME", "R2_PUBLIC_URL"];
+  const r2Missing = r2Vars.filter((k) => !process.env[k]);
+  if (r2Missing.length) warn("R2 video upload", `missing: ${r2Missing.join(", ")}`);
+  else pass("R2 env vars present");
 
   if (!url || !serviceKey) {
     console.log("\nCannot continue without Supabase credentials.\n");

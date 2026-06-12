@@ -125,6 +125,40 @@ export const api = {
   activityLogs: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").ActivityLog[] }>("/activity-logs"),
   },
+  r2: {
+    status: () =>
+      fetchApi<{
+        success: boolean;
+        configured: boolean;
+        bucketName: string | null;
+        publicUrl: string | null;
+        reason: string | null;
+      }>("/r2/upload/session"),
+    uploadVideo: async (
+      file: File,
+      onProgress?: (percent: number) => void
+    ): Promise<{ url: string; objectKey: string }> => {
+      const { uploadVideoToR2 } = await import("@/lib/r2-upload");
+
+      const sessionRes = await fetch("/api/r2/upload/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          fileSize: file.size,
+        }),
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok) {
+        throw new Error(sessionData.error || "Failed to start R2 upload");
+      }
+
+      await uploadVideoToR2(sessionData.uploadUrl, file, (p) => onProgress?.(p.percent));
+
+      return { url: sessionData.publicUrl, objectKey: sessionData.objectKey };
+    },
+  },
   upload: async (file: File, folder: "thumbnails" | "apk" | "screenshots") => {
     const formData = new FormData();
     formData.append("file", file);

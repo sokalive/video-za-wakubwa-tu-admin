@@ -8,6 +8,8 @@ export interface Admin {
   createdAt: string;
 }
 
+export type VideoStorage = "r2" | "google_drive";
+
 export interface Video {
   id: string;
   title: string;
@@ -15,6 +17,9 @@ export interface Video {
   categoryId: string;
   categoryName: string;
   thumbnailUrl: string;
+  videoUrl: string;
+  r2ObjectKey: string;
+  videoStorage: VideoStorage;
   googleDriveUrl: string;
   duration: string;
   resolution: string;

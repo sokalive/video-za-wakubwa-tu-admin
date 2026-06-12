@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS videos (
   thumbnail_url TEXT NOT NULL DEFAULT '',
   google_drive_url TEXT DEFAULT '',
   video_url TEXT DEFAULT '',
+  r2_object_key TEXT DEFAULT '',
+  video_storage TEXT DEFAULT 'google_drive',
   trailer_url TEXT,
   duration TEXT DEFAULT '0:00',
   resolution TEXT DEFAULT '1080p',

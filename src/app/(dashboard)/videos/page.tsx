@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Link2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Film, Upload } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatNumber } from "@/lib/utils";
-import type { Video } from "@/types";
+import { formatBytes } from "@/lib/r2-upload";
+import type { Video, VideoStorage } from "@/types";
 
 const emptyVideo = {
   title: "",
   description: "",
   categoryId: "",
+  videoUrl: "",
+  r2ObjectKey: "",
+  videoStorage: "r2" as VideoStorage,
   googleDriveUrl: "",
   isVip: false,
   isFeatured: false,
@@ -45,8 +49,10 @@ export default function VideosPage() {
   const [form, setForm] = useState(emptyVideo);
   const [tagInput, setTagInput] = useState("");
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [savePhase, setSavePhase] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data, isLoading } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -60,6 +66,14 @@ export default function VideosPage() {
     queryKey: ["categories"],
     queryFn: () => api.categories.list(),
   });
+
+  const { data: r2Status } = useQuery({
+    queryKey: ["r2", "status"],
+    queryFn: () => api.r2.status(),
+    staleTime: 60_000,
+  });
+
+  const r2Configured = r2Status?.configured ?? false;
 
   const createMutation = useMutation({
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
@@ -94,7 +108,9 @@ export default function VideosPage() {
     setForm(emptyVideo);
     setTagInput("");
     setThumbnailFile(null);
+    setVideoFile(null);
     setSavePhase("");
+    setUploadProgress(0);
   };
 
   const openCreate = () => {
@@ -109,26 +125,54 @@ export default function VideosPage() {
       title: video.title,
       description: video.description,
       categoryId: video.categoryId,
+      videoUrl: video.videoUrl,
+      r2ObjectKey: video.r2ObjectKey,
+      videoStorage: video.videoStorage,
       googleDriveUrl: video.googleDriveUrl,
       isVip: video.isVip,
       isFeatured: video.isFeatured,
       tags: video.tags,
     });
+    setVideoFile(null);
     setSavePhase("");
+    setUploadProgress(0);
     setDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.googleDriveUrl.trim()) {
-      alert("Paste a Google Drive share link for the video.");
+    const hasExistingSource = !!(form.videoUrl || form.googleDriveUrl);
+    const hasNewVideoFile = !!videoFile;
+
+    if (!editingVideo && !hasNewVideoFile) {
+      alert("Select a video file to upload to Cloudflare R2.");
+      return;
+    }
+
+    if (!editingVideo && !hasNewVideoFile && !hasExistingSource) {
+      alert("Upload a video file.");
       return;
     }
 
     setSaving(true);
     try {
       const payload: Partial<Video> = { ...form };
+
+      if (videoFile) {
+        if (!r2Configured) {
+          throw new Error(r2Status?.reason ?? "Cloudflare R2 is not configured on the server.");
+        }
+        setSavePhase("Uploading video to Cloudflare R2...");
+        setUploadProgress(0);
+        const { url, objectKey } = await api.r2.uploadVideo(videoFile, setUploadProgress);
+        payload.videoUrl = url;
+        payload.r2ObjectKey = objectKey;
+        payload.videoStorage = "r2";
+        payload.googleDriveUrl = "";
+      } else if (!payload.videoUrl && !payload.googleDriveUrl) {
+        throw new Error("Video file or existing video URL is required.");
+      }
 
       if (thumbnailFile) {
         setSavePhase("Uploading thumbnail...");
@@ -147,6 +191,7 @@ export default function VideosPage() {
     } finally {
       setSaving(false);
       setSavePhase("");
+      setUploadProgress(0);
     }
   };
 
@@ -159,6 +204,9 @@ export default function VideosPage() {
 
   const videos = data?.data || [];
   const categories = categoriesData?.data || [];
+
+  const playbackLink = (video: Video) =>
+    video.videoStorage === "r2" && video.videoUrl ? video.videoUrl : video.googleDriveUrl;
 
   return (
     <DashboardShell title="Videos">
@@ -204,7 +252,7 @@ export default function VideosPage() {
                   <TableRow>
                     <TableHead>Video</TableHead>
                     <TableHead>Category</TableHead>
-                    <TableHead>Drive Link</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Views</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -234,9 +282,15 @@ export default function VideosPage() {
                       </TableCell>
                       <TableCell>{video.categoryName}</TableCell>
                       <TableCell>
-                        {video.googleDriveUrl ? (
-                          <a href={video.googleDriveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:underline">
-                            <ExternalLink className="h-3 w-3" /> Drive
+                        {playbackLink(video) ? (
+                          <a
+                            href={playbackLink(video)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-400 hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            {video.videoStorage === "r2" ? "R2" : "Drive"}
                           </a>
                         ) : "—"}
                       </TableCell>
@@ -287,19 +341,50 @@ export default function VideosPage() {
                 <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-4">
                 <Label className="flex items-center gap-2">
-                  <Link2 className="h-4 w-4" /> Google Drive Share Link
+                  <Film className="h-4 w-4" /> Video File (Cloudflare R2)
                 </Label>
                 <Input
-                  value={form.googleDriveUrl}
-                  onChange={(e) => setForm({ ...form, googleDriveUrl: e.target.value })}
-                  placeholder="https://drive.google.com/file/d/FILE_ID/view"
-                  required
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.webm,.mov,.avi,.mkv"
+                  disabled={saving || !r2Configured}
+                  onChange={(e) => {
+                    setVideoFile(e.target.files?.[0] ?? null);
+                    if (e.target.files?.[0]) setUploadProgress(0);
+                  }}
                 />
-                <p className="text-xs text-gray-500">
-                  Upload the video to Google Drive manually, set sharing to &quot;Anyone with the link&quot;, then paste the link here.
-                </p>
+                {videoFile && (
+                  <p className="text-xs text-gray-400">
+                    Selected: {videoFile.name} ({formatBytes(videoFile.size)})
+                  </p>
+                )}
+                {editingVideo && !videoFile && (form.videoUrl || form.googleDriveUrl) && (
+                  <p className="text-xs text-gray-400">
+                    Current: {form.videoStorage === "r2" ? "R2" : "Google Drive (legacy)"} — select a new file to replace
+                  </p>
+                )}
+                {saving && savePhase.startsWith("Uploading video") && (
+                  <div className="space-y-1">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full bg-blue-500 transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-blue-400">{uploadProgress}% — {savePhase}</p>
+                  </div>
+                )}
+                {r2Configured ? (
+                  <p className="text-xs text-green-400/80 flex items-center gap-1">
+                    <Upload className="h-3 w-3" />
+                    Videos upload to Cloudflare R2 ({r2Status?.bucketName})
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-400">
+                    {r2Status?.reason ?? "R2 not configured. Set R2_* env vars on Vercel and redeploy."}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
