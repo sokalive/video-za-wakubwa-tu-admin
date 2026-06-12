@@ -38,6 +38,10 @@ export function mapVideo(row: Record<string, any>): Video {
     duration: row.duration ?? "0:00",
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
+    vipTrialSeconds:
+      row.vip_trial_seconds === null || row.vip_trial_seconds === undefined
+        ? null
+        : row.vip_trial_seconds,
     isFeatured: row.is_featured ?? false,
     autoplay: row.autoplay ?? false,
     tags: Array.isArray(row.tags) ? row.tags : [],
@@ -65,6 +69,7 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.duration !== undefined) data.duration = video.duration;
   if (video.resolution !== undefined) data.resolution = video.resolution;
   if (video.isVip !== undefined) data.is_vip = video.isVip;
+  if (video.vipTrialSeconds !== undefined) data.vip_trial_seconds = video.vipTrialSeconds;
   if (video.isFeatured !== undefined) data.is_featured = video.isFeatured;
   if (video.autoplay !== undefined) data.autoplay = video.autoplay;
   if (video.tags !== undefined) data.tags = video.tags;
@@ -322,7 +327,7 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
-  const [videosRes, categoriesRes, paymentsRes, likedRes] = await Promise.all([
+  const [videosRes, categoriesRes, paymentsRes, likedRes, eventsRes] = await Promise.all([
     db.from("videos").select("id, title, views, category_id, created_at").order("views", { ascending: false }),
     db.from("categories").select("id, name"),
     db
@@ -335,18 +340,31 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
       .select("id, title, views, likes_count")
       .order("likes_count", { ascending: false })
       .limit(20),
+    db
+      .from("analytics_events")
+      .select("event_type, created_at")
+      .gte("created_at", thirtyDaysAgo.toISOString()),
   ]);
 
   const videos = videosRes.data ?? [];
   const likedVideos = likedRes.data ?? [];
   const categories = categoriesRes.data ?? [];
   const payments = paymentsRes.data ?? [];
+  const events = eventsRes.data ?? [];
 
   const dailyViews = Array.from({ length: 30 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (29 - i));
     return { date: d.toISOString().split("T")[0], views: 0 };
   });
+
+  const viewEventTypes = new Set(["page_view", "visit", "video_view", "vip_video_view"]);
+  for (const event of events) {
+    if (!viewEventTypes.has(String(event.event_type ?? ""))) continue;
+    const date = String(event.created_at).split("T")[0];
+    const row = dailyViews.find((d) => d.date === date);
+    if (row) row.views += 1;
+  }
 
   const revenueByDate = new Map<string, number>();
   for (const payment of payments) {
@@ -359,17 +377,48 @@ export async function computeAnalytics(db: ReturnType<typeof import("./client").
     revenue: revenueByDate.get(date) ?? 0,
   }));
 
-  const weeklyViews = Array.from({ length: 12 }, (_, i) => ({
-    week: `Week ${i + 1}`,
-    views: 0,
-  }));
+  const weeklyViews = Array.from({ length: 12 }, (_, i) => {
+    const start = new Date();
+    start.setDate(start.getDate() - (11 - i) * 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return {
+      week: `W${start.toISOString().slice(5, 10)}`,
+      views: 0,
+      start: start.toISOString().split("T")[0],
+      end: end.toISOString().split("T")[0],
+    };
+  });
+
+  for (const event of events) {
+    if (!viewEventTypes.has(String(event.event_type ?? ""))) continue;
+    const created = new Date(String(event.created_at));
+    const bucket = weeklyViews.find((w) => {
+      const start = new Date(`${w.start}T00:00:00.000Z`);
+      const end = new Date(`${w.end}T23:59:59.999Z`);
+      return created >= start && created <= end;
+    });
+    if (bucket) bucket.views += 1;
+  }
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const monthlyViews = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
+    d.setDate(1);
     d.setMonth(d.getMonth() - (5 - i));
-    return { month: monthNames[d.getMonth()], views: 0 };
+    return {
+      month: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+      views: 0,
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    };
   });
+
+  for (const event of events) {
+    if (!viewEventTypes.has(String(event.event_type ?? ""))) continue;
+    const key = String(event.created_at).slice(0, 7);
+    const bucket = monthlyViews.find((m) => m.key === key);
+    if (bucket) bucket.views += 1;
+  }
 
   const viewsByCategory = new Map<string, number>();
   const countByCategory = new Map<string, number>();
