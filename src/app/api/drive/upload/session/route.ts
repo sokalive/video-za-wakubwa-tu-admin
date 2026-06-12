@@ -5,6 +5,7 @@ import {
   getDriveConfigStatus,
   isAllowedVideoFile,
   MAX_VIDEO_BYTES,
+  probeDriveFolder,
 } from "@/lib/google-drive-client";
 
 export async function POST(request: Request) {
@@ -63,8 +64,18 @@ export async function POST(request: Request) {
       fileSize,
     });
   } catch (err) {
+    let folderProbe = null;
+    try {
+      folderProbe = await probeDriveFolder();
+    } catch {
+      // ignore secondary probe failure
+    }
     return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : "Failed to create upload session" },
+      {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to create upload session",
+        folderProbe,
+      },
       { status: 500 }
     );
   }
@@ -78,9 +89,21 @@ export async function GET() {
 
   const driveStatus = getDriveConfigStatus();
 
+  let folderProbe = null;
+  if (driveStatus.configured) {
+    try {
+      folderProbe = await probeDriveFolder();
+    } catch {
+      folderProbe = null;
+    }
+  }
+
   return NextResponse.json({
     success: true,
     ...driveStatus,
+    folderAccessible: folderProbe?.ok ?? false,
+    folderName: folderProbe?.folderName ?? null,
+    folderProbe,
     maxBytes: MAX_VIDEO_BYTES,
   });
 }

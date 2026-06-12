@@ -95,7 +95,9 @@ GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 
 ## Verify Upload Works
 
-1. Admin → Videos → Add Video → select `.mp4` file
+1. While logged in, open: `GET /api/drive/diagnostics`
+2. Confirm `uploadReady: true` and `folderProbe.ok: true`
+3. Admin → Videos → Add Video → select `.mp4` file
 2. Progress bar should show upload percentage
 3. After save, **Drive Link** column shows the Google Drive URL
 4. Open public website → video should appear and play
@@ -122,7 +124,8 @@ GET /api/drive/upload/session
 | `Google Drive upload is not configured` | Check GET `/api/drive/upload/session` while logged in — response includes `reason`, `folderIdSet`, `jsonParseOk` |
 | `GOOGLE_DRIVE_FOLDER_ID is not set` | Add folder ID from Drive URL to Vercel **and redeploy** |
 | `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON is set but invalid JSON` | Use minified single-line JSON, or `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64`, or split `GOOGLE_DRIVE_CLIENT_EMAIL` + `GOOGLE_DRIVE_PRIVATE_KEY` |
-| `Insufficient permissions` | Share Drive folder with service account email as **Editor** |
+| `Insufficient permissions` / `404 File not found` on folder ID | Service account cannot see the folder. Share folder with **exact** `clientEmail` from GET `/api/drive/diagnostics` as **Editor**. For Shared Drives, add service account as **Content manager** on the drive. |
+| Upload UI green but upload fails | Open `/api/drive/diagnostics` while logged in — check `folderProbe.ok` and `fixHint` |
 | `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
 | Upload fails at 0% (CORS) | Ensure Drive API is enabled; try different browser |
 | Video won't play on website | File must be shared "anyone with link" — finalize step handles this |

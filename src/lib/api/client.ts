@@ -144,9 +144,41 @@ export const api = {
         jsonParseOk: boolean;
         clientEmail: string | null;
         folderId: string | null;
+        rawFolderIdLength: number;
         reason: string | null;
+        folderAccessible?: boolean;
+        folderName?: string | null;
+        folderProbe?: {
+          ok: boolean;
+          folderId: string;
+          serviceAccountEmail: string;
+          folderName: string | null;
+          fixHint: string | null;
+          error: string | null;
+        } | null;
         maxBytes: number;
       }>("/drive/upload/session"),
+    diagnostics: () =>
+      fetchApi<{
+        success: boolean;
+        config: {
+          folderId: string | null;
+          clientEmail: string | null;
+          rawFolderIdLength: number;
+        };
+        folderProbe: {
+          ok: boolean;
+          folderId: string;
+          serviceAccountEmail: string;
+          folderName: string | null;
+          httpStatus: number | null;
+          isSharedDrive: boolean;
+          canAddChildren: boolean | null;
+          error: string | null;
+          fixHint: string | null;
+        } | null;
+        uploadReady: boolean;
+      }>("/drive/diagnostics"),
     uploadVideo: async (
       file: File,
       onProgress?: (percent: number) => void

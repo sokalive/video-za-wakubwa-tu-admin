@@ -71,7 +71,8 @@ export default function VideosPage() {
   });
 
   const driveConfigured = driveStatus?.configured ?? false;
-  const driveConfigReason = driveStatus?.reason ?? null;
+  const driveFolderReady = driveStatus?.folderAccessible ?? false;
+  const driveConfigReason = driveStatus?.reason ?? driveStatus?.folderProbe?.fixHint ?? null;
 
   const createMutation = useMutation({
     mutationFn: (video: Partial<Video>) => api.videos.create(video),
@@ -152,6 +153,9 @@ export default function VideosPage() {
       if (videoFile) {
         if (!driveConfigured) {
           throw new Error("Google Drive upload is not configured on the server.");
+        }
+        if (!driveFolderReady && driveStatus?.folderProbe?.fixHint) {
+          throw new Error(driveStatus.folderProbe.fixHint);
         }
         setUploadPhase("Uploading video to Google Drive...");
         setUploadProgress(0);
@@ -325,7 +329,7 @@ export default function VideosPage() {
                 <Input
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,.mp4,.webm,.mov,.avi,.mkv"
-                  disabled={uploading || !driveConfigured}
+                  disabled={uploading || !driveConfigured || !driveFolderReady}
                   onChange={(e) => {
                     const file = e.target.files?.[0] ?? null;
                     setVideoFile(file);
@@ -348,10 +352,18 @@ export default function VideosPage() {
                     <p className="text-xs text-blue-400">{uploadProgress}% — {uploadPhase}</p>
                   </div>
                 )}
-                {driveConfigured ? (
+                {driveConfigured && driveFolderReady ? (
                   <p className="text-xs text-green-400/80 flex items-center gap-1">
-                    <Upload className="h-3 w-3" /> Uploads go directly to Google Drive (not Vercel/Supabase).
+                    <Upload className="h-3 w-3" />
+                    Uploads go to Google Drive folder
+                    {driveStatus?.folderName ? ` "${driveStatus.folderName}"` : ""} ({driveStatus?.folderId})
                   </p>
+                ) : driveConfigured && !driveFolderReady ? (
+                  <div className="space-y-1 text-xs text-amber-400">
+                    <p>Folder ID at runtime: <code className="text-amber-200">{driveStatus?.folderId ?? "—"}</code></p>
+                    <p>Service account: <code className="text-amber-200">{driveStatus?.folderProbe?.serviceAccountEmail ?? driveStatus?.clientEmail ?? "—"}</code></p>
+                    <p>{driveStatus?.folderProbe?.fixHint ?? driveConfigReason ?? "Service account cannot access this folder (404). Share the folder as Editor."}</p>
+                  </div>
                 ) : (
                   <div className="space-y-1 text-xs text-amber-400">
                     <p>{driveConfigReason ?? "Google Drive upload not configured."}</p>
