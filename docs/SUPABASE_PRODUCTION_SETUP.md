@@ -44,6 +44,25 @@
 1. New query → copy `supabase/migrations/002_google_drive.sql`
 2. Click **Run**
 
+### Step 3b: Run R2 video storage migration (**required for Cloudflare R2 uploads**)
+
+1. New query → copy `supabase/migrations/003_r2_video_storage.sql`
+2. Click **Run**
+3. Verify: open `GET https://your-admin.vercel.app/api/setup/migrate-r2` → `r2ColumnsReady: true`
+
+Or locally / on Vercel with `SUPABASE_DATABASE_URL` set:
+
+```bash
+node scripts/apply-r2-migration.mjs
+```
+
+Or after deploy:
+
+```bash
+curl -X POST https://your-admin.vercel.app/api/setup/migrate-r2 \
+  -H "x-setup-token: YOUR_JWT_SECRET"
+```
+
 ### Step 4: Create storage bucket
 
 1. SQL Editor → copy `supabase/storage.sql`
