@@ -6,29 +6,51 @@ export interface DriveUploadProgress {
   percent: number;
 }
 
+function isNetworkFetchError(err: unknown): boolean {
+  return err instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(err.message);
+}
+
 /**
  * Upload a video file directly to Google Drive using a resumable session URL.
  * Bytes go Browser → Google Drive (not through Vercel), supporting large files.
+ *
+ * The session URL must be created with the browser Origin header so Google allows CORS on PUT.
  */
 export async function uploadVideoToDriveResumable(
   uploadUrl: string,
   file: File,
   onProgress?: (progress: DriveUploadProgress) => void
 ): Promise<string> {
+  if (!uploadUrl?.startsWith("https://")) {
+    throw new Error("Invalid Google Drive upload session URL.");
+  }
+
   let offset = 0;
 
   while (offset < file.size) {
     const chunkEnd = Math.min(offset + CHUNK_SIZE, file.size);
     const chunk = file.slice(offset, chunkEnd);
 
-    const response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Length": String(chunk.size),
-        "Content-Range": `bytes ${offset}-${chunkEnd - 1}/${file.size}`,
-      },
-      body: chunk,
-    });
+    let response: Response;
+    try {
+      response = await fetch(uploadUrl, {
+        method: "PUT",
+        mode: "cors",
+        credentials: "omit",
+        headers: {
+          // Do not set Content-Length — browsers treat it as a forbidden header in fetch().
+          "Content-Range": `bytes ${offset}-${chunkEnd - 1}/${file.size}`,
+        },
+        body: chunk,
+      });
+    } catch (err) {
+      if (isNetworkFetchError(err)) {
+        throw new Error(
+          "Google Drive upload blocked by browser (CORS/network). The upload session must be created with your admin panel Origin. Redeploy the latest admin build and retry."
+        );
+      }
+      throw err;
+    }
 
     if (response.status === 308) {
       offset = chunkEnd;

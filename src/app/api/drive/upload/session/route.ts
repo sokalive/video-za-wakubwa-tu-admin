@@ -6,6 +6,7 @@ import {
   isAllowedVideoFile,
   MAX_VIDEO_BYTES,
   probeDriveFolder,
+  resolveBrowserUploadOrigin,
 } from "@/lib/google-drive-client";
 
 export async function POST(request: Request) {
@@ -32,6 +33,10 @@ export async function POST(request: Request) {
     const fileName = String(body.fileName ?? "").trim();
     const mimeType = String(body.mimeType ?? "application/octet-stream");
     const fileSize = Number(body.fileSize ?? 0);
+    const browserOrigin = resolveBrowserUploadOrigin(
+      request,
+      typeof body.uploadOrigin === "string" ? body.uploadOrigin : null
+    );
 
     if (!fileName) {
       return NextResponse.json({ success: false, error: "fileName is required" }, { status: 400 });
@@ -55,13 +60,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const uploadUrl = await createResumableUploadSession(fileName, mimeType);
+    if (!browserOrigin) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Could not determine admin panel origin for Google Drive CORS. Set NEXT_PUBLIC_APP_URL on Vercel or pass uploadOrigin from the browser.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const uploadUrl = await createResumableUploadSession(fileName, mimeType, {
+      browserOrigin,
+      fileSize,
+    });
 
     return NextResponse.json({
       success: true,
       uploadUrl,
       fileName,
       fileSize,
+      browserOrigin,
     });
   } catch (err) {
     let folderProbe = null;

@@ -570,12 +570,60 @@ async function resolveUploadFolder(
   return { metadata, lookupTrace, permissionsTrace, accessibleSharedFolders, fixHint: null };
 }
 
+export interface ResumableSessionOptions {
+  /** Browser origin (e.g. https://admin.example.com). Required for client-side PUT uploads — Google binds CORS to this origin. */
+  browserOrigin?: string | null;
+  fileSize?: number;
+}
+
+/** Resolve the admin panel origin for Google resumable-upload CORS binding. */
+export function resolveBrowserUploadOrigin(
+  request: Request,
+  bodyOrigin?: string | null
+): string {
+  const fromBody = sanitizeEnv(bodyOrigin ?? "");
+  if (fromBody) {
+    try {
+      return new URL(fromBody).origin;
+    } catch {
+      return fromBody;
+    }
+  }
+
+  const fromHeader = sanitizeEnv(request.headers.get("origin") ?? "");
+  if (fromHeader) return fromHeader;
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      // ignore invalid referer
+    }
+  }
+
+  const appUrl = sanitizeEnv(process.env.NEXT_PUBLIC_APP_URL);
+  if (appUrl) {
+    try {
+      return new URL(appUrl).origin;
+    } catch {
+      return appUrl;
+    }
+  }
+
+  const vercel = sanitizeEnv(process.env.VERCEL_URL);
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+
+  return "";
+}
+
 async function createResumableUploadSessionRaw(
   accessToken: string,
   creds: ServiceAccountCreds,
   metadata: DriveFolderMetadata,
   fileName: string,
-  mimeType: string
+  mimeType: string,
+  options: ResumableSessionOptions = {}
 ): Promise<{ uploadUrl: string | null; trace: DriveApiTrace }> {
   const queryParams: Record<string, string> = {
     uploadType: "resumable",
@@ -595,6 +643,8 @@ async function createResumableUploadSessionRaw(
 
   const url = `https://www.googleapis.com/upload/drive/v3/files?${new URLSearchParams(queryParams).toString()}`;
 
+  const browserOrigin = sanitizeEnv(options.browserOrigin ?? "");
+
   const trace: DriveApiTrace = {
     operation: "files.create.resumable",
     method: "POST",
@@ -604,6 +654,7 @@ async function createResumableUploadSessionRaw(
       supportsAllDrives: true,
       supportsTeamDrives: true,
       driveId: metadata.driveId ?? undefined,
+      browserOrigin: browserOrigin || undefined,
     },
     requestBody,
     responseStatus: null,
@@ -613,13 +664,25 @@ async function createResumableUploadSessionRaw(
     projectId: creds.project_id,
   };
 
+  const initHeaders: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "X-Upload-Content-Type": mimeType || "video/mp4",
+  };
+
+  if (options.fileSize && options.fileSize > 0) {
+    initHeaders["X-Upload-Content-Length"] = String(options.fileSize);
+  }
+
+  // Google binds CORS on the resumable session to the Origin of this init request.
+  // Server-side diagnostics omit this; browser uploads must pass the panel origin.
+  if (browserOrigin) {
+    initHeaders.Origin = browserOrigin;
+  }
+
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      "X-Upload-Content-Type": mimeType || "video/mp4",
-    },
+    headers: initHeaders,
     body: JSON.stringify(requestBody),
   });
 
@@ -783,7 +846,8 @@ export async function probeDriveFolder(folderId?: string): Promise<DriveFolderPr
 
 export async function createResumableUploadSession(
   fileName: string,
-  mimeType: string
+  mimeType: string,
+  options: ResumableSessionOptions = {}
 ): Promise<string> {
   const folderId = getDriveFolderId();
   if (!folderId) throw new Error("GOOGLE_DRIVE_FOLDER_ID is not configured.");
@@ -800,7 +864,8 @@ export async function createResumableUploadSession(
     creds,
     resolved.metadata,
     fileName,
-    mimeType || "video/mp4"
+    mimeType || "video/mp4",
+    options
   );
 
   if (!session.uploadUrl) {

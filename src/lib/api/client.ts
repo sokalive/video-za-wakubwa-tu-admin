@@ -192,6 +192,7 @@ export const api = {
           fileName: file.name,
           mimeType: file.type || "application/octet-stream",
           fileSize: file.size,
+          uploadOrigin: typeof window !== "undefined" ? window.location.origin : undefined,
         }),
       });
       const sessionData = await sessionRes.json();

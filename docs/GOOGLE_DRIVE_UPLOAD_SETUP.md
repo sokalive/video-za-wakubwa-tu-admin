@@ -63,6 +63,7 @@ Add these to the **admin** Vercel project (`video-za-wakubwa-tu-admin`):
 | `GOOGLE_DRIVE_FOLDER_ID` | **Yes** | Folder ID from Step 3 (uploads fail without this) |
 | `GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON` | **Yes** | Entire JSON key file as one line |
 | `GOOGLE_DRIVE_IMPERSONATE_EMAIL` | No | Workspace user to impersonate (domain-wide delegation) when My Drive sharing is insufficient |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Admin panel URL (e.g. `https://video-za-wakubwa-tu-admin.vercel.app`) — binds Google resumable-upload CORS for browser PUT requests |
 
 **Both variables are required.** Setting only the service account JSON is not enough — the panel checks for `GOOGLE_DRIVE_FOLDER_ID` at runtime.
 
@@ -130,7 +131,7 @@ GET /api/drive/upload/session
 | Upload UI green but upload fails | Check `uploadSessionTrace` in diagnostics — Shared Drive uploads require `driveId` query param (handled automatically when `folderMetadata.driveId` is set). |
 | My Drive shared folder still 404 | Personal Gmail folders often block service-account uploads even when shared. **Move folder to a Shared Drive** or set `GOOGLE_DRIVE_IMPERSONATE_EMAIL` to the folder owner's Google Workspace email (requires domain-wide delegation). |
 | `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
-| Upload fails at 0% (CORS) | Ensure Drive API is enabled; try different browser |
+| `Failed to fetch` at 0% progress | Browser PUT to Google blocked by CORS. The server must pass your admin panel `Origin` when creating the resumable session (handled automatically). Set `NEXT_PUBLIC_APP_URL=https://your-admin.vercel.app` on Vercel if origin detection fails. |
 | Video won't play on website | File must be shared "anyone with link" — finalize step handles this |
 | `storageQuotaExceeded` | Service accounts have no personal quota — upload to a **Shared Drive** or folder owned by a user account that shared Editor access |
 
