@@ -153,6 +153,8 @@ export const api = {
           folderId: string;
           serviceAccountEmail: string;
           folderName: string | null;
+          storageType?: string;
+          requiresSharedDrive?: boolean;
           fixHint: string | null;
           error: string | null;
         } | null;

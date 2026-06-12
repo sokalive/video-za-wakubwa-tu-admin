@@ -71,6 +71,14 @@ export async function uploadVideoToDriveResumable(
     }
 
     const text = await response.text().catch(() => "");
+    if (
+      response.status === 403 &&
+      /storageQuota|storage quota|do not have storage quota/i.test(text)
+    ) {
+      throw new Error(
+        "HTTP 403: Service accounts do not have storage quota. Move GOOGLE_DRIVE_FOLDER_ID to a Shared Drive folder (storageType=shared_drive), add the service account as Content manager, and redeploy."
+      );
+    }
     throw new Error(`Google Drive upload failed (HTTP ${response.status}): ${text.slice(0, 200)}`);
   }
 

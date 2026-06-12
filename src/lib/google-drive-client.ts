@@ -88,6 +88,8 @@ export interface DriveDiagnostics {
   accessibleSharedDrives: Array<{ id: string | null; name: string | null }>;
   uploadSessionTrace: DriveApiTrace | null;
   uploadReady: boolean;
+  /** True when folder is personal My Drive — service accounts cannot upload there without impersonation. */
+  requiresSharedDrive: boolean;
   fixHint: string | null;
   error: string | null;
 }
@@ -106,6 +108,7 @@ export interface DriveFolderProbe {
   isSharedDrive: boolean;
   canAddChildren: boolean | null;
   wasShortcut: boolean;
+  requiresSharedDrive: boolean;
   error: string | null;
   fixHint: string | null;
   apiTrace: DriveApiTrace | null;
@@ -300,6 +303,51 @@ async function getAuthenticatedDrive(): Promise<{
 
 export function getServiceAccountEmail(): string | null {
   return parseServiceAccount()?.client_email ?? getDriveConfigStatus().clientEmail;
+}
+
+export function getConfiguredSharedDriveId(): string | null {
+  return sanitizeEnv(process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID) || null;
+}
+
+/** Effective Shared Drive ID for uploads (from folder metadata or env fallback). */
+export function getEffectiveDriveId(metadata: DriveFolderMetadata): string | null {
+  return metadata.driveId ?? metadata.teamDriveId ?? getConfiguredSharedDriveId();
+}
+
+export function buildSharedDriveRequiredMessage(
+  metadata: DriveFolderMetadata,
+  serviceAccountEmail: string
+): string {
+  return (
+    `Folder "${metadata.name ?? metadata.resolvedParentId}" is in personal My Drive (storageType=my_drive). ` +
+    `Service accounts have no storage quota and cannot upload there (HTTP 403). ` +
+    `Create a Shared Drive, add ${serviceAccountEmail} as Content manager, create a videos folder inside it, ` +
+    `set GOOGLE_DRIVE_FOLDER_ID to that folder ID, and redeploy. ` +
+    `Diagnostics should show storageType=shared_drive and folderMetadata.driveId set.`
+  );
+}
+
+/**
+ * Service accounts cannot upload into personal My Drive folders (403 storage quota).
+ * Shared Drive folders are required unless Workspace impersonation is configured.
+ */
+export function getUploadDestinationBlockReason(
+  metadata: DriveFolderMetadata,
+  serviceAccountEmail: string,
+  impersonating: string | null
+): string | null {
+  if (metadata.storageType === "my_drive" && !impersonating) {
+    return buildSharedDriveRequiredMessage(metadata, serviceAccountEmail);
+  }
+
+  if (metadata.storageType === "shared_drive" && !getEffectiveDriveId(metadata)) {
+    return (
+      `Folder "${metadata.name ?? metadata.resolvedParentId}" is in a Shared Drive but driveId is missing. ` +
+      `Set GOOGLE_DRIVE_SHARED_DRIVE_ID to the Shared Drive ID on Vercel and redeploy.`
+    );
+  }
+
+  return null;
 }
 
 function inferStorageType(file: drive_v3.Schema$File): DriveFolderMetadata["storageType"] {
@@ -631,9 +679,11 @@ async function createResumableUploadSessionRaw(
     supportsTeamDrives: "true",
   };
 
+  const effectiveDriveId = getEffectiveDriveId(metadata);
+
   // Required when uploading into a Shared Drive folder
-  if (metadata.driveId) {
-    queryParams.driveId = metadata.driveId;
+  if (effectiveDriveId) {
+    queryParams.driveId = effectiveDriveId;
   }
 
   const requestBody = {
@@ -653,7 +703,7 @@ async function createResumableUploadSessionRaw(
       uploadType: "resumable",
       supportsAllDrives: true,
       supportsTeamDrives: true,
-      driveId: metadata.driveId ?? undefined,
+      driveId: effectiveDriveId ?? undefined,
       browserOrigin: browserOrigin || undefined,
     },
     requestBody,
@@ -714,6 +764,7 @@ export async function runDriveDiagnostics(): Promise<DriveDiagnostics> {
       accessibleSharedDrives: [],
       uploadSessionTrace: null,
       uploadReady: false,
+      requiresSharedDrive: false,
       fixHint: config.reason,
       error: config.reason,
     };
@@ -749,8 +800,37 @@ export async function runDriveDiagnostics(): Promise<DriveDiagnostics> {
       accessibleSharedDrives,
       uploadSessionTrace: null,
       uploadReady: false,
+      requiresSharedDrive: false,
       fixHint: resolved.fixHint,
       error: JSON.stringify(resolved.lookupTrace.responseBody),
+    };
+  }
+
+  const destinationBlock = getUploadDestinationBlockReason(
+    resolved.metadata,
+    creds.client_email,
+    impersonating
+  );
+  if (destinationBlock) {
+    return {
+      config,
+      auth: {
+        emailAddress: about?.user?.emailAddress ?? creds.client_email,
+        displayName: about?.user?.displayName ?? null,
+        permissionId: null,
+        tokenObtained: true,
+        impersonating,
+      },
+      folderMetadata: resolved.metadata,
+      folderLookupTrace: resolved.lookupTrace,
+      permissionsTrace: resolved.permissionsTrace,
+      accessibleSharedFolders: resolved.accessibleSharedFolders,
+      accessibleSharedDrives,
+      uploadSessionTrace: null,
+      uploadReady: false,
+      requiresSharedDrive: resolved.metadata.storageType === "my_drive",
+      fixHint: destinationBlock,
+      error: destinationBlock,
     };
   }
 
@@ -765,10 +845,11 @@ export async function runDriveDiagnostics(): Promise<DriveDiagnostics> {
   const uploadReady = uploadSession.uploadUrl !== null;
   let fixHint = resolved.fixHint;
   if (!uploadReady) {
-    fixHint =
-      resolved.metadata.storageType === "my_drive"
-        ? `Upload to My Drive shared folder failed (HTTP ${uploadSession.trace.responseStatus}). Personal Gmail folders often block service-account uploads. Move videos folder to a Shared Drive, add ${creds.client_email} as Content manager, update GOOGLE_DRIVE_FOLDER_ID, redeploy. Or set GOOGLE_DRIVE_IMPERSONATE_EMAIL to the folder owner's Workspace email.`
-        : `Resumable upload failed (HTTP ${uploadSession.trace.responseStatus}): ${JSON.stringify(uploadSession.trace.responseBody)}`;
+    const responseText = JSON.stringify(uploadSession.trace.responseBody);
+    const isQuotaError = /storageQuota|storage quota|do not have storage quota/i.test(responseText);
+    fixHint = isQuotaError
+      ? buildSharedDriveRequiredMessage(resolved.metadata, creds.client_email)
+      : `Resumable upload failed (HTTP ${uploadSession.trace.responseStatus}): ${responseText}`;
   }
 
   return {
@@ -787,6 +868,7 @@ export async function runDriveDiagnostics(): Promise<DriveDiagnostics> {
     accessibleSharedDrives,
     uploadSessionTrace: uploadSession.trace,
     uploadReady,
+    requiresSharedDrive: false,
     fixHint: uploadReady ? null : fixHint,
     error: uploadReady ? null : JSON.stringify(uploadSession.trace.responseBody),
   };
@@ -811,6 +893,7 @@ export async function probeDriveFolder(folderId?: string): Promise<DriveFolderPr
       isSharedDrive: false,
       canAddChildren: null,
       wasShortcut: false,
+      requiresSharedDrive: false,
       error: "Missing folder ID or credentials.",
       fixHint: getDriveConfigStatus().reason,
       apiTrace: null,
@@ -836,6 +919,7 @@ export async function probeDriveFolder(folderId?: string): Promise<DriveFolderPr
     isSharedDrive: meta?.storageType === "shared_drive",
     canAddChildren: meta?.capabilities?.canAddChildren ?? null,
     wasShortcut: meta?.wasShortcut ?? false,
+    requiresSharedDrive: diagnostics.requiresSharedDrive,
     error: diagnostics.error,
     fixHint: diagnostics.fixHint,
     apiTrace: diagnostics.folderLookupTrace,
@@ -852,11 +936,20 @@ export async function createResumableUploadSession(
   const folderId = getDriveFolderId();
   if (!folderId) throw new Error("GOOGLE_DRIVE_FOLDER_ID is not configured.");
 
-  const { drive, creds, accessToken } = await getAuthenticatedDrive();
+  const { drive, creds, accessToken, impersonating } = await getAuthenticatedDrive();
   const resolved = await resolveUploadFolder(drive, creds, folderId);
 
   if (!resolved.metadata) {
     throw new Error(resolved.fixHint ?? "Folder not accessible.");
+  }
+
+  const destinationBlock = getUploadDestinationBlockReason(
+    resolved.metadata,
+    creds.client_email,
+    impersonating
+  );
+  if (destinationBlock) {
+    throw new Error(destinationBlock);
   }
 
   const session = await createResumableUploadSessionRaw(

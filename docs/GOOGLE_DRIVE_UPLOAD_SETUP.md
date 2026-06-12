@@ -133,16 +133,19 @@ GET /api/drive/upload/session
 | `Invalid credentials` | Check JSON is valid single-line string; private_key has `\n` |
 | `Failed to fetch` at 0% progress | Browser PUT to Google blocked by CORS. The server must pass your admin panel `Origin` when creating the resumable session (handled automatically). Set `NEXT_PUBLIC_APP_URL=https://your-admin.vercel.app` on Vercel if origin detection fails. |
 | Video won't play on website | File must be shared "anyone with link" — finalize step handles this |
-| `storageQuotaExceeded` | Service accounts have no personal quota — upload to a **Shared Drive** or folder owned by a user account that shared Editor access |
+| `HTTP 403` / `storageQuotaExceeded` / `Service Accounts do not have storage quota` | Folder is in personal My Drive (`storageType=my_drive`). **Required fix:** move to a Shared Drive — see [GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md](./GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md) |
 
-### Shared Drive (recommended for production)
+### Shared Drive (**required** for production)
 
-For unlimited storage, use a **Shared Drive** (Google Workspace):
+Service accounts **cannot upload** to personal My Drive (`HTTP 403: no storage quota`). See **[GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md](./GOOGLE_DRIVE_SHARED_DRIVE_SETUP.md)** for full steps.
 
-1. Create Shared Drive in Google Drive
+Quick checklist:
+
+1. Create a **Shared Drive** in Google Workspace
 2. Add service account as **Content manager**
-3. Create `VZW Videos` folder inside Shared Drive
-4. Use that folder's ID as `GOOGLE_DRIVE_FOLDER_ID`
+3. Create `VZW Videos` folder **inside** the Shared Drive
+4. Set `GOOGLE_DRIVE_FOLDER_ID` to that folder ID
+5. Redeploy — diagnostics must show `storageType: "shared_drive"` and `uploadReady: true`
 
 ---
 
