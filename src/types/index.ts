@@ -77,6 +77,52 @@ export interface VipTrialSettings {
   durationUnit: TrialDurationUnit;
 }
 
+export interface SonicpesaSettings {
+  enabled: boolean;
+  environment: "live" | "sandbox";
+  apiEndpoint: string;
+  api_endpoint?: string;
+  accountId: string;
+  account_id?: string;
+  apiKey?: string;
+  webhookUrl: string;
+  webhook_url?: string;
+  hasApiKey: boolean;
+  apiKeyMasked: string;
+  isActiveCheckoutProvider: boolean;
+  payment_provider: string;
+  lastTestAt: string | null;
+  last_test_at?: string | null;
+  lastTestOk: boolean | null;
+  last_test_ok?: boolean | null;
+  lastTestMessage: string;
+  last_test_message?: string;
+  lastWebhookAt: string | null;
+  last_webhook_at?: string | null;
+  lastWebhookEvent: string;
+  last_webhook_event?: string;
+  lastWebhookOrderId: string;
+  last_webhook_order_id?: string;
+  setAsActiveCheckoutProvider?: boolean;
+  envOverrideAny?: boolean;
+  envOverrideActive?: Record<string, boolean>;
+}
+
+export interface BillingTransaction {
+  id: number;
+  orderId: string;
+  externalId: string | null;
+  planId: string | null;
+  planName: string;
+  phone: string;
+  amount: number;
+  currency: string;
+  status: string;
+  deviceId: string | null;
+  paymentProvider: string | null;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   name: string;

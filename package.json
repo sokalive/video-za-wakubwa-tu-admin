@@ -16,7 +16,8 @@
     "seed:vip-plans": "node scripts/seed-vip-plans.mjs",
     "setup:production-vip": "node scripts/production-vip-setup.mjs",
     "migrate:vip-trial": "node scripts/apply-vip-trial-migration.mjs",
-    "setup:production-vip-trial": "node scripts/production-vip-trial-complete.mjs"
+    "setup:production-vip-trial": "node scripts/production-vip-trial-complete.mjs",
+    "migrate:sonicpesa": "node scripts/apply-sonicpesa-migration.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1067.0",

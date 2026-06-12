@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Play,
   Timer,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/categories", label: "Categories", icon: FolderOpen },
   { href: "/vip-plans", label: "VIP Plans", icon: Crown },
   { href: "/vip-trial-settings", label: "VIP Trial Settings", icon: Timer },
+  { href: "/sonicpesa", label: "SonicPesa Settings", icon: Zap },
   { href: "/users", label: "Users", icon: Users },
   { href: "/payments", label: "Payments", icon: CreditCard },
   { href: "/apk", label: "APK Manager", icon: Smartphone },

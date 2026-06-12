@@ -11,6 +11,10 @@ const publicPaths = [
   "/api/setup/migrate-analytics",
   "/api/setup/seed-vip-plans",
   "/api/setup/migrate-vip-trial",
+  "/api/setup/migrate-sonicpesa",
+  "/api/payments/checkout-providers",
+  "/api/payments/sonicpesa/create-order",
+  "/api/payments/sonicpesa/webhook",
 ];
 
 export async function middleware(request: NextRequest) {
@@ -18,6 +22,9 @@ export async function middleware(request: NextRequest) {
 
   if (
     publicPaths.some((p) => pathname.startsWith(p)) ||
+    pathname.startsWith("/api/payments/sonicpesa/status/") ||
+    pathname.startsWith("/api/payments/sonicpesa/verify/") ||
+    pathname.startsWith("/api/payments/sonicpesa/reconcile/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
   ) {

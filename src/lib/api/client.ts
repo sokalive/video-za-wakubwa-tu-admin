@@ -95,6 +95,25 @@ export const api = {
         body: JSON.stringify(settings),
       }),
   },
+  sonicpesa: {
+    get: () => fetchApi<{ success: boolean; data: import("@/types").SonicpesaSettings }>("/settings/sonicpesa"),
+    update: (body: Record<string, unknown>) =>
+      fetchApi<{ success: boolean; data: import("@/types").SonicpesaSettings }>("/settings/sonicpesa", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    test: () =>
+      fetchApi<{ success: boolean; message: string; httpStatus?: number }>("/settings/sonicpesa/test", {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+  },
+  transactions: {
+    list: (status?: string) => {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+      return fetchApi<{ success: boolean; data: import("@/types").BillingTransaction[] }>(`/transactions${qs}`);
+    },
+  },
   users: {
     list: (params?: { search?: string; isVip?: string; isActive?: string }) => {
       const query = new URLSearchParams(params as Record<string, string>).toString();
