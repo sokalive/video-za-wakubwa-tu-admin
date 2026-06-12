@@ -223,6 +223,8 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
     views: 0,
+    likes_count: 0,
+    autoplay: body.autoplay ?? false,
     published: true,
   };
   const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
