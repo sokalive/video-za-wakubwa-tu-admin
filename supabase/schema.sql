@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS videos (
   trial_enabled BOOLEAN NOT NULL DEFAULT false,
   trial_duration_value INT NOT NULL DEFAULT 0,
   trial_duration_unit TEXT NOT NULL DEFAULT 'minutes',
+  vip_trial_seconds INT,
   rating INT NOT NULL DEFAULT 75,
   channel TEXT DEFAULT 'VZW',
   tags TEXT[] DEFAULT '{}',

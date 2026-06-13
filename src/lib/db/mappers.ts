@@ -4,6 +4,7 @@ import {
   inferPlanDurationUnit,
   type PlanDurationUnit,
 } from "@/lib/duration";
+import { resolveVipTrialSeconds } from "@/lib/db/video-schema";
 import type {
   Admin,
   Video,
@@ -38,10 +39,7 @@ export function mapVideo(row: Record<string, any>): Video {
     duration: row.duration ?? "0:00",
     resolution: row.resolution ?? "1080p",
     isVip: row.is_vip ?? false,
-    vipTrialSeconds:
-      row.vip_trial_seconds === null || row.vip_trial_seconds === undefined
-        ? null
-        : row.vip_trial_seconds,
+    vipTrialSeconds: resolveVipTrialSeconds(row),
     isFeatured: row.is_featured ?? false,
     isPinned: row.is_pinned ?? false,
     pinOrder: row.pin_order ?? null,

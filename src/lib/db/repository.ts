@@ -4,6 +4,11 @@ import { deleteR2Object } from "@/lib/r2-client";
 import { getSupabaseAdmin, STORAGE_BUCKET } from "./client";
 import { supabaseRest } from "./rest";
 import {
+  getVideoOptionalColumns,
+  prepareVideoUpdateData,
+  prepareVideoWriteRow,
+} from "./video-schema";
+import {
   mapAdmin,
   mapVideo,
   mapVideoToDb,
@@ -366,10 +371,12 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     trial_duration_unit: trialDurationUnit,
     published: true,
   };
+  const cols = await getVideoOptionalColumns();
+  const payload = prepareVideoWriteRow(row, cols);
   const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
     method: "POST",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify(row),
+    body: JSON.stringify(payload),
   });
   if (error) throw new Error(error);
   const created = data?.[0];
@@ -418,12 +425,15 @@ export async function updateVideo(
   const previousR2Key = (existing?.r2_object_key as string) ?? "";
   const nextR2Key = body.r2ObjectKey ?? previousR2Key;
 
+  const cols = await getVideoOptionalColumns();
+  const payload = prepareVideoUpdateData(updates, cols);
+
   const { data: updatedRows, error } = await supabaseRest<Record<string, unknown>[]>(
     `videos?id=eq.${encodeURIComponent(id)}`,
     {
       method: "PATCH",
       headers: { Prefer: "return=representation" },
-      body: JSON.stringify(updates),
+      body: JSON.stringify(payload),
     }
   );
   if (error) throw new Error(error);
