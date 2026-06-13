@@ -222,13 +222,15 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
 
   const id = `vid-${Date.now()}`;
   const settings = await getSettings();
-  const isVip = body.isVip ?? false;
   let vipTrialSeconds: number | null = null;
   if (isVip) {
     if (body.vipTrialSeconds !== undefined && body.vipTrialSeconds !== null) {
       vipTrialSeconds = body.vipTrialSeconds;
-    } else if (settings.vipTrialEnabled) {
-      vipTrialSeconds = settings.vipTrialSecondsDefault;
+    } else if (settings.vipTrial.enabled) {
+      const { durationValue, durationUnit } = settings.vipTrial;
+      if (durationUnit === "seconds") vipTrialSeconds = durationValue;
+      else if (durationUnit === "hours") vipTrialSeconds = durationValue * 3600;
+      else vipTrialSeconds = durationValue * 60;
     }
   }
 
@@ -246,10 +248,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     duration: body.duration ?? "0:00",
     resolution: body.resolution ?? "1080p",
     is_vip: isVip,
-<<<<<<< Updated upstream
-=======
     vip_trial_seconds: vipTrialSeconds,
->>>>>>> Stashed changes
     is_featured: body.isFeatured ?? false,
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],

@@ -49,35 +49,37 @@ export default function SettingsPage() {
               <Label htmlFor="vip-trial-enabled">Enable global VIP trial default</Label>
               <Switch
                 id="vip-trial-enabled"
-                checked={form.vipTrialEnabled}
-                onCheckedChange={(vipTrialEnabled) =>
-                  setForm({ ...form, vipTrialEnabled })
+                checked={form.vipTrial.enabled}
+                onCheckedChange={(enabled) =>
+                  setForm({ ...form, vipTrial: { ...form.vipTrial, enabled } })
                 }
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vip-trial-seconds">Default trial duration (seconds)</Label>
+              <Label htmlFor="vip-trial-duration">Default trial duration</Label>
               <Input
-                id="vip-trial-seconds"
+                id="vip-trial-duration"
                 type="number"
                 min={0}
-                value={form.vipTrialSecondsDefault}
+                value={form.vipTrial.durationValue}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    vipTrialSecondsDefault: Math.max(0, Number(e.target.value) || 0),
+                    vipTrial: {
+                      ...form.vipTrial,
+                      durationValue: Math.max(0, Number(e.target.value) || 0),
+                    },
                   })
                 }
               />
               <p className="text-xs text-muted-foreground">
-                New VIP uploads inherit this value automatically. Individual videos can override it.
+                Uses {form.vipTrial.durationUnit}. New VIP uploads inherit this automatically.
               </p>
             </div>
             <Button
               onClick={() =>
                 saveMutation.mutate({
-                  vipTrialEnabled: form.vipTrialEnabled,
-                  vipTrialSecondsDefault: form.vipTrialSecondsDefault,
+                  vipTrial: form.vipTrial,
                 })
               }
               disabled={saveMutation.isPending}
