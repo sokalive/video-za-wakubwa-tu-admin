@@ -12,6 +12,8 @@ const publicPaths = [
   "/api/setup/seed-vip-plans",
   "/api/setup/migrate-vip-trial",
   "/api/setup/migrate-sonicpesa",
+  "/api/setup/migrate-video-pins",
+  "/api/setup/migrate-video-schema",
   "/api/payments/checkout-providers",
   "/api/payments/sonicpesa/create-order",
   "/api/payments/sonicpesa/webhook",
