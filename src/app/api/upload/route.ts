@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
     const folder = (formData.get("folder") as string) || "thumbnails";
+    const version = String(formData.get("version") ?? "").trim();
 
     if (!file) {
       return NextResponse.json({ success: false, error: "No file provided" }, { status: 400 });
@@ -27,7 +28,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Invalid folder. Video files must use Google Drive links." }, { status: 400 });
     }
 
-    const url = await uploadFile(file, folder as "thumbnails" | "apk" | "screenshots");
+    const url = await uploadFile(file, folder as "thumbnails" | "apk" | "screenshots", {
+      version: folder === "apk" ? version : undefined,
+    });
     return NextResponse.json({ success: true, url });
   } catch (err) {
     return NextResponse.json(

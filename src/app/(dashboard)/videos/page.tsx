@@ -37,6 +37,7 @@ const emptyVideo = {
   videoStorage: "r2" as VideoStorage,
   googleDriveUrl: "",
   isVip: false,
+  vipTrialSeconds: null as number | null,
   isFeatured: false,
   autoplay: false,
   trialEnabled: false,
@@ -145,6 +146,7 @@ export default function VideosPage() {
       videoStorage: video.videoStorage,
       googleDriveUrl: video.googleDriveUrl,
       isVip: video.isVip,
+      vipTrialSeconds: video.vipTrialSeconds ?? null,
       isFeatured: video.isFeatured,
       autoplay: video.autoplay,
       trialEnabled: video.trialEnabled,
@@ -532,7 +534,7 @@ export default function VideosPage() {
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
               </div>
               <div className="flex items-center justify-between">
-                <Label>Autoplay on watch page</Label>
+                <Label>Autoplay preview on video cards</Label>
                 <Switch checked={form.autoplay} onCheckedChange={(v) => setForm({ ...form, autoplay: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || saving}>

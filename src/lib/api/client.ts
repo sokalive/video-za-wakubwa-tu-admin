@@ -240,10 +240,15 @@ export const api = {
       return { url: sessionData.publicUrl, objectKey: sessionData.objectKey };
     },
   },
-  upload: async (file: File, folder: "thumbnails" | "apk" | "screenshots") => {
+  upload: async (
+    file: File,
+    folder: "thumbnails" | "apk" | "screenshots",
+    options?: { version?: string }
+  ) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
+    if (options?.version) formData.append("version", options.version);
     const res = await fetch("/api/upload", { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Upload failed");

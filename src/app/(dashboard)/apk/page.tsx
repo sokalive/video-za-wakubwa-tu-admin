@@ -86,7 +86,12 @@ export default function ApkPage() {
                   <pre className="text-sm text-gray-300 whitespace-pre-wrap bg-white/5 rounded-lg p-4">{apk.releaseNotes}</pre>
                 </div>
                 <Button variant="outline" className="w-full" asChild>
-                  <a href={apk.fileUrl} download target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={apk.fileUrl}
+                    download={`Video-Za-Wakubwa-Tu-v${apk.version}.apk`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <Download className="h-4 w-4 mr-2" /> Download APK
                   </a>
                 </Button>
@@ -115,7 +120,7 @@ export default function ApkPage() {
                 try {
                   const payload: Record<string, unknown> = { ...form };
                   if (apkFile) {
-                    const { url } = await api.upload(apkFile, "apk");
+                    const { url } = await api.upload(apkFile, "apk", { version: form.version });
                     payload.fileUrl = url;
                     payload.fileSize = `${(apkFile.size / (1024 * 1024)).toFixed(1)} MB`;
                   }

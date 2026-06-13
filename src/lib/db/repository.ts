@@ -221,6 +221,17 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
   }
 
   const id = `vid-${Date.now()}`;
+  const settings = await getSettings();
+  const isVip = body.isVip ?? false;
+  let vipTrialSeconds: number | null = null;
+  if (isVip) {
+    if (body.vipTrialSeconds !== undefined && body.vipTrialSeconds !== null) {
+      vipTrialSeconds = body.vipTrialSeconds;
+    } else if (settings.vipTrialEnabled) {
+      vipTrialSeconds = settings.vipTrialSecondsDefault;
+    }
+  }
+
   const row = {
     id,
     title: body.title,
@@ -235,6 +246,10 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     duration: body.duration ?? "0:00",
     resolution: body.resolution ?? "1080p",
     is_vip: isVip,
+<<<<<<< Updated upstream
+=======
+    vip_trial_seconds: vipTrialSeconds,
+>>>>>>> Stashed changes
     is_featured: body.isFeatured ?? false,
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
@@ -663,16 +678,26 @@ export { computeDashboardStats, computeAnalytics };
 
 export async function uploadFile(
   file: File,
-  folder: "thumbnails" | "apk" | "screenshots"
+  folder: "thumbnails" | "apk" | "screenshots",
+  options?: { version?: string }
 ): Promise<string> {
   const db = getSupabaseAdmin();
   const ext = file.name.split(".").pop() ?? "bin";
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const version = String(options?.version ?? "").trim();
+  const safeVersion = version.replace(/[^0-9A-Za-z.-]/g, "").replace(/\.+/g, ".").replace(/^\.+|\.+$/g, "");
+
+  let path: string;
+  if (folder === "apk" && safeVersion) {
+    path = `${folder}/Video-Za-Wakubwa-Tu-v${safeVersion}.apk`;
+  } else {
+    path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error } = await db.storage.from(STORAGE_BUCKET).upload(path, buffer, {
-    contentType: file.type,
-    upsert: false,
+    contentType: file.type || (folder === "apk" ? "application/vnd.android.package-archive" : file.type),
+    upsert: folder === "apk" && Boolean(safeVersion),
   });
   if (error) throw new Error(error.message);
 

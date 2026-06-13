@@ -34,6 +34,7 @@ export interface Video {
   duration: string;
   resolution: string;
   isVip: boolean;
+  vipTrialSeconds?: number | null;
   isFeatured: boolean;
   autoplay: boolean;
   tags: string[];
