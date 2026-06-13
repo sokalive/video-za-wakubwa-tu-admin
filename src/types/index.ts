@@ -131,8 +131,10 @@ export interface User {
   phone?: string;
   isVip: boolean;
   vipExpiresAt?: string;
+  subscriptionStatus?: "active" | "pending" | "expired" | "none";
   isActive: boolean;
   totalSpent: number;
+  transactionCount?: number;
   joinedAt: string;
   lastActive: string;
 }

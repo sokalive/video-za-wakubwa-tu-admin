@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     const [data, stats] = await Promise.all([
       listDeviceUsers({ search, isVip, isActive }),
-      getDeviceUserStats(),
+      getDeviceUserStats({ search, isVip, isActive }),
     ]);
     return NextResponse.json({ success: true, data, stats });
   } catch (err) {

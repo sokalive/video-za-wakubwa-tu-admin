@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, CreditCard, TrendingUp, RefreshCw, Clock, XCircle } from "lucide-react";
+import { DollarSign, CreditCard, TrendingUp, RefreshCw, Clock, XCircle, Trash2 } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -26,12 +28,14 @@ const statusVariant: Record<string, "success" | "warning" | "destructive" | "sec
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["payments", statusFilter],
     queryFn: () =>
       api.payments.list({
-        status: statusFilter !== "all" ? statusFilter : undefined,
+        status: statusFilter !== "all" && statusFilter !== "reports" ? statusFilter : undefined,
       }),
   });
 
@@ -40,8 +44,49 @@ export default function PaymentsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["payments"] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (ids: number[]) => api.payments.bulkDelete(ids),
+    onSuccess: () => {
+      setSelected(new Set());
+      setConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+
   const payments = data?.data || [];
   const stats = data?.stats;
+
+  const filtered = useMemo(
+    () =>
+      statusFilter === "all" || statusFilter === "reports"
+        ? payments
+        : payments.filter((p) => p.status === statusFilter),
+    [payments, statusFilter]
+  );
+
+  const allSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
+  const selectedCount = filtered.filter((p) => selected.has(p.id)).length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((p) => p.id)));
+    }
+  };
+
+  const toggleOne = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const revenueChart = payments
     .filter((p) => p.status === "completed")
@@ -54,13 +99,18 @@ export default function PaymentsPage() {
     }, [])
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const filtered =
-    statusFilter === "all" ? payments : payments.filter((p) => p.status === statusFilter);
-
   return (
     <DashboardShell title="Payments">
       <div className="space-y-6">
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-between gap-3">
+          {selectedCount > 0 && statusFilter !== "reports" ? (
+            <Button variant="destructive" size="sm" onClick={() => setConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Selected ({selectedCount})
+            </Button>
+          ) : (
+            <div />
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -99,7 +149,13 @@ export default function PaymentsPage() {
           <p className="text-xs text-gray-500">Last calculated: {formatDate(stats.recalculatedAt)}</p>
         )}
 
-        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+        <Tabs
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v);
+            setSelected(new Set());
+          }}
+        >
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
@@ -108,18 +164,18 @@ export default function PaymentsPage() {
             <TabsTrigger value="reports">Revenue Chart</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="all" className="mt-4">
-            <PaymentTable rows={filtered} loading={isLoading} />
-          </TabsContent>
-          <TabsContent value="completed" className="mt-4">
-            <PaymentTable rows={filtered} loading={isLoading} />
-          </TabsContent>
-          <TabsContent value="pending" className="mt-4">
-            <PaymentTable rows={filtered} loading={isLoading} />
-          </TabsContent>
-          <TabsContent value="failed" className="mt-4">
-            <PaymentTable rows={filtered} loading={isLoading} />
-          </TabsContent>
+          {["all", "completed", "pending", "failed"].map((tab) => (
+            <TabsContent key={tab} value={tab} className="mt-4">
+              <PaymentTable
+                rows={filtered}
+                loading={isLoading}
+                selected={selected}
+                allSelected={allSelected}
+                onToggleAll={toggleAll}
+                onToggleOne={toggleOne}
+              />
+            </TabsContent>
+          ))}
 
           <TabsContent value="reports" className="mt-4">
             {revenueChart.length > 0 ? (
@@ -130,6 +186,16 @@ export default function PaymentsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <BulkDeleteDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete selected payments?"
+        description="This will permanently delete {count} payment record(s). Linked VIP subscriptions created by those payments will also be removed."
+        count={selectedCount}
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleteMutation.mutate([...selected])}
+      />
     </DashboardShell>
   );
 }
@@ -137,9 +203,17 @@ export default function PaymentsPage() {
 function PaymentTable({
   rows,
   loading,
+  selected,
+  allSelected,
+  onToggleAll,
+  onToggleOne,
 }: {
   rows: import("@/types").BillingTransaction[];
   loading: boolean;
+  selected: Set<number>;
+  allSelected: boolean;
+  onToggleAll: () => void;
+  onToggleOne: (id: number) => void;
 }) {
   if (loading) {
     return (
@@ -160,6 +234,9 @@ function PaymentTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <Checkbox checked={allSelected} onCheckedChange={onToggleAll} aria-label="Select all payments" />
+            </TableHead>
             <TableHead>Phone / Device</TableHead>
             <TableHead>Order ID</TableHead>
             <TableHead>Plan</TableHead>
@@ -171,7 +248,14 @@ function PaymentTable({
         </TableHeader>
         <TableBody>
           {rows.map((p) => (
-            <TableRow key={p.id}>
+            <TableRow key={p.id} data-state={selected.has(p.id) ? "selected" : undefined}>
+              <TableCell>
+                <Checkbox
+                  checked={selected.has(p.id)}
+                  onCheckedChange={() => onToggleOne(p.id)}
+                  aria-label={`Select payment ${p.orderId}`}
+                />
+              </TableCell>
               <TableCell>
                 <div>
                   <p className="font-medium text-white">{p.phone || "—"}</p>

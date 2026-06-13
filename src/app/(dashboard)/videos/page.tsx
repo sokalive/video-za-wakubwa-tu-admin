@@ -5,7 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Film, Upload } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +61,8 @@ export default function VideosPage() {
   const [saving, setSaving] = useState(false);
   const [savePhase, setSavePhase] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -115,6 +119,16 @@ export default function VideosPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.videos.delete(id),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => api.videos.bulkDelete(ids),
+    onSuccess: () => {
+      setSelected(new Set());
+      setBulkConfirmOpen(false);
       queryClient.invalidateQueries({ queryKey: ["videos"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
@@ -230,6 +244,22 @@ export default function VideosPage() {
 
   const videos = data?.data || [];
   const categories = categoriesData?.data || [];
+  const allSelected = videos.length > 0 && videos.every((v) => selected.has(v.id));
+  const selectedCount = videos.filter((v) => selected.has(v.id)).length;
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(videos.map((v) => v.id)));
+  };
+
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const playbackLink = (video: Video) =>
     video.videoStorage === "r2" && video.videoUrl ? video.videoUrl : video.googleDriveUrl;
@@ -259,9 +289,16 @@ export default function VideosPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Add Video
-          </Button>
+          <div className="flex gap-2">
+            {selectedCount > 0 && (
+              <Button variant="destructive" onClick={() => setBulkConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedCount})
+              </Button>
+            )}
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> Add Video
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -284,6 +321,9 @@ export default function VideosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all videos" />
+                    </TableHead>
                     <TableHead>Video</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Source</TableHead>
@@ -296,6 +336,13 @@ export default function VideosPage() {
                 <TableBody>
                   {videos.map((video) => (
                     <TableRow key={video.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.has(video.id)}
+                          onCheckedChange={() => toggleOne(video.id)}
+                          aria-label={`Select ${video.title}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           {video.thumbnailUrl ? (
@@ -543,6 +590,16 @@ export default function VideosPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <BulkDeleteDialog
+          open={bulkConfirmOpen}
+          onOpenChange={setBulkConfirmOpen}
+          title="Delete selected videos?"
+          description="This will permanently delete {count} video(s) and their storage files where applicable."
+          count={selectedCount}
+          loading={bulkDeleteMutation.isPending}
+          onConfirm={() => bulkDeleteMutation.mutate([...selected])}
+        />
       </div>
     </DashboardShell>
   );

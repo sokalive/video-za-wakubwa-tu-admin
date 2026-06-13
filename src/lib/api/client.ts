@@ -57,6 +57,11 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<{ success: boolean }>(`/videos/${id}`, { method: "DELETE" }),
+    bulkDelete: (ids: string[]) =>
+      fetchApi<{ success: boolean; data: { deleted: number } }>("/videos/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      }),
   },
   categories: {
     list: () => fetchApi<{ success: boolean; data: import("@/types").Category[] }>("/categories"),
@@ -116,11 +121,22 @@ export const api = {
   },
   users: {
     list: (params?: { search?: string; isVip?: string; isActive?: string }) => {
-      const query = new URLSearchParams(params as Record<string, string>).toString();
-      return fetchApi<{ success: boolean; data: import("@/types").User[]; stats: { total: number; vip: number; active: number } }>(
-        `/users${query ? `?${query}` : ""}`
-      );
+      const query = new URLSearchParams();
+      if (params?.search) query.set("search", params.search);
+      if (params?.isVip && params.isVip !== "all") query.set("isVip", params.isVip);
+      if (params?.isActive && params.isActive !== "all") query.set("isActive", params.isActive);
+      const qs = query.toString();
+      return fetchApi<{
+        success: boolean;
+        data: import("@/types").User[];
+        stats: { total: number; vip: number; active: number; paying?: number };
+      }>(`/users${qs ? `?${qs}` : ""}`);
     },
+    bulkDelete: (deviceIds: string[]) =>
+      fetchApi<{ success: boolean; data: { deleted: number } }>("/users/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ deviceIds }),
+      }),
   },
   payments: {
     list: (params?: { status?: string; refresh?: boolean }) => {
@@ -134,6 +150,11 @@ export const api = {
         stats: import("@/types").PaymentStats;
       }>(`/payments${qs ? `?${qs}` : ""}`);
     },
+    bulkDelete: (ids: number[]) =>
+      fetchApi<{ success: boolean; data: { deleted: number; subscriptionsRemoved: number } }>(
+        "/payments/bulk-delete",
+        { method: "POST", body: JSON.stringify({ ids }) }
+      ),
   },
   subscriptions: {
     list: () =>
@@ -205,6 +226,11 @@ export const api = {
       fetchApi<{ success: boolean; data: import("@/types").VideoLikeStat[] }>(
         "/likes-analytics"
       ),
+    bulkDelete: (videoIds: string[]) =>
+      fetchApi<{ success: boolean; data: { reset: number } }>("/likes-analytics/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ videoIds }),
+      }),
   },
   r2: {
     status: () =>

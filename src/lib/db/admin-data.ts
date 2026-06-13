@@ -148,11 +148,18 @@ export async function listDeviceUsers(filters?: {
 
   let users: User[] = [...devices.values()].map((d) => {
     const sub = subByDevice.get(d.deviceId);
-    const vipActive =
-      sub?.status === "active" && new Date(sub.expires_at).getTime() > now;
+    const expiresMs = sub?.expires_at ? new Date(sub.expires_at).getTime() : 0;
+    const vipActive = sub?.status === "active" && expiresMs > now;
     const lastMs = new Date(d.lastActive).getTime();
     const isActive = now - lastMs <= activeWindowMs;
     const shortId = d.deviceId.length > 12 ? `${d.deviceId.slice(0, 8)}…` : d.deviceId;
+
+    let subscriptionStatus: User["subscriptionStatus"] = "none";
+    if (sub) {
+      if (vipActive) subscriptionStatus = "active";
+      else if (sub.status === "pending") subscriptionStatus = "pending";
+      else subscriptionStatus = "expired";
+    }
 
     return {
       id: d.deviceId,
@@ -161,8 +168,10 @@ export async function listDeviceUsers(filters?: {
       phone: d.phone || undefined,
       isVip: vipActive,
       vipExpiresAt: sub?.expires_at,
+      subscriptionStatus,
       isActive,
       totalSpent: d.totalSpent,
+      transactionCount: d.txnCount,
       joinedAt: d.firstSeen,
       lastActive: d.lastActive,
     };
@@ -189,12 +198,17 @@ export async function listDeviceUsers(filters?: {
   return users;
 }
 
-export async function getDeviceUserStats() {
-  const users = await listDeviceUsers();
+export async function getDeviceUserStats(filters?: {
+  search?: string;
+  isVip?: boolean;
+  isActive?: boolean;
+}) {
+  const users = await listDeviceUsers(filters);
   return {
     total: users.length,
     vip: users.filter((u) => u.isVip).length,
     active: users.filter((u) => u.isActive).length,
+    paying: users.filter((u) => (u.transactionCount ?? 0) > 0).length,
   };
 }
 
