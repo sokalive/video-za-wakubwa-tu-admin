@@ -36,6 +36,8 @@ export interface Video {
   isVip: boolean;
   vipTrialSeconds?: number | null;
   isFeatured: boolean;
+  isPinned: boolean;
+  pinOrder: number | null;
   autoplay: boolean;
   tags: string[];
   views: number;

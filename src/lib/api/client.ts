@@ -57,6 +57,11 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<{ success: boolean }>(`/videos/${id}`, { method: "DELETE" }),
+    setPin: (id: string, body: { pinned: boolean; pinOrder?: number | null }) =>
+      fetchApi<{ success: boolean; data: import("@/types").Video }>(`/videos/${id}/pin`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     bulkDelete: (ids: string[]) =>
       fetchApi<{ success: boolean; data: { deleted: number } }>("/videos/bulk-delete", {
         method: "POST",

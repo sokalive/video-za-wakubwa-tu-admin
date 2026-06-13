@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS videos (
   resolution TEXT DEFAULT '1080p',
   is_vip BOOLEAN NOT NULL DEFAULT false,
   is_featured BOOLEAN NOT NULL DEFAULT false,
+  is_pinned BOOLEAN NOT NULL DEFAULT false,
+  pin_order INT,
   autoplay BOOLEAN NOT NULL DEFAULT false,
   views INT NOT NULL DEFAULT 0,
   likes_count INT NOT NULL DEFAULT 0,
@@ -66,6 +68,7 @@ CREATE TABLE IF NOT EXISTS videos (
 
 CREATE INDEX IF NOT EXISTS idx_videos_category ON videos(category_id);
 CREATE INDEX IF NOT EXISTS idx_videos_featured ON videos(is_featured);
+CREATE INDEX IF NOT EXISTS idx_videos_pinned ON videos(is_pinned, pin_order);
 CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_published ON videos(published);
 

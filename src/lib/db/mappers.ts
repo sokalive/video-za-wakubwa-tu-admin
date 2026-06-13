@@ -43,6 +43,8 @@ export function mapVideo(row: Record<string, any>): Video {
         ? null
         : row.vip_trial_seconds,
     isFeatured: row.is_featured ?? false,
+    isPinned: row.is_pinned ?? false,
+    pinOrder: row.pin_order ?? null,
     autoplay: row.autoplay ?? false,
     tags: Array.isArray(row.tags) ? row.tags : [],
     views: row.views ?? 0,
@@ -71,6 +73,8 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.isVip !== undefined) data.is_vip = video.isVip;
   if (video.vipTrialSeconds !== undefined) data.vip_trial_seconds = video.vipTrialSeconds;
   if (video.isFeatured !== undefined) data.is_featured = video.isFeatured;
+  if (video.isPinned !== undefined) data.is_pinned = video.isPinned;
+  if (video.pinOrder !== undefined) data.pin_order = video.pinOrder;
   if (video.autoplay !== undefined) data.autoplay = video.autoplay;
   if (video.tags !== undefined) data.tags = video.tags;
   if (video.views !== undefined) data.views = video.views;

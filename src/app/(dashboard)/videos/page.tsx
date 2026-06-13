@@ -134,6 +134,21 @@ export default function VideosPage() {
     },
   });
 
+  const pinMutation = useMutation({
+    mutationFn: ({
+      id,
+      pinned,
+      pinOrder,
+    }: {
+      id: string;
+      pinned: boolean;
+      pinOrder?: number;
+    }) => api.videos.setPin(id, { pinned, pinOrder }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
+    },
+  });
+
   const resetForm = () => {
     setForm(emptyVideo);
     setTagInput("");
@@ -357,7 +372,10 @@ export default function VideosPage() {
                             <div className="h-[45px] w-[80px] rounded-lg bg-white/10" />
                           )}
                           <div>
-                            <p className="font-medium text-white">{video.title}</p>
+                            <p className="font-medium text-white flex items-center gap-2">
+                              {video.isPinned && <span title="Pinned">📌</span>}
+                              {video.title}
+                            </p>
                             <p className="text-xs text-gray-500 line-clamp-1">{video.description}</p>
                           </div>
                         </div>
@@ -380,14 +398,57 @@ export default function VideosPage() {
                       <TableCell>{formatNumber(video.likesCount)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
+                          {video.isPinned && (
+                            <Badge variant="default" className="bg-amber-600/90 hover:bg-amber-600/90">
+                              📌 Pinned{video.pinOrder != null ? ` #${video.pinOrder}` : ""}
+                            </Badge>
+                          )}
                           {video.isVip && <Badge variant="default"><Crown className="h-3 w-3 mr-1" />VIP</Badge>}
                           {video.isFeatured && <Badge variant="warning"><Star className="h-3 w-3 mr-1" />Featured</Badge>}
                           {video.autoplay && <Badge variant="secondary">Autoplay</Badge>}
-                          {!video.isVip && !video.isFeatured && !video.autoplay && <Badge variant="secondary">Free</Badge>}
+                          {!video.isVip && !video.isFeatured && !video.autoplay && !video.isPinned && (
+                            <Badge variant="secondary">Free</Badge>
+                          )}
                         </div>
+                        {video.isPinned && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Label htmlFor={`pin-order-${video.id}`} className="text-xs text-gray-400 whitespace-nowrap">
+                              Order
+                            </Label>
+                            <Input
+                              id={`pin-order-${video.id}`}
+                              type="number"
+                              min={1}
+                              className="h-7 w-16 text-xs"
+                              defaultValue={video.pinOrder ?? 1}
+                              key={`${video.id}-${video.pinOrder}`}
+                              disabled={pinMutation.isPending}
+                              onBlur={(e) => {
+                                const next = Math.max(1, Number(e.target.value) || 1);
+                                if (next !== video.pinOrder) {
+                                  pinMutation.mutate({ id: video.id, pinned: true, pinOrder: next });
+                                }
+                              }}
+                            />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button
+                            variant={video.isPinned ? "secondary" : "ghost"}
+                            size="sm"
+                            title={video.isPinned ? "Unpin video" : "Pin video"}
+                            disabled={pinMutation.isPending}
+                            onClick={() =>
+                              pinMutation.mutate({
+                                id: video.id,
+                                pinned: !video.isPinned,
+                              })
+                            }
+                          >
+                            📌 {video.isPinned ? "Unpin" : "Pin"}
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(video)}>
                             <Pencil className="h-4 w-4" />
                           </Button>

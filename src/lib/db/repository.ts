@@ -151,6 +151,110 @@ async function syncCategoryVideoCounts(db: ReturnType<typeof getSupabaseAdmin>, 
   await Promise.all(uniqueIds.map((categoryId) => syncCategoryVideoCount(db, categoryId)));
 }
 
+function sortVideosForAdmin(videos: Video[]): Video[] {
+  return [...videos].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.isPinned && b.isPinned) return (a.pinOrder ?? 999) - (b.pinOrder ?? 999);
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+async function compactPinOrders(db: ReturnType<typeof getSupabaseAdmin>): Promise<void> {
+  const { data: pinned, error } = await db
+    .from("videos")
+    .select("id")
+    .eq("is_pinned", true)
+    .order("pin_order", { ascending: true });
+  if (error) throw new Error(error.message);
+  if (!pinned?.length) return;
+
+  await Promise.all(
+    pinned.map((row, index) =>
+      db.from("videos").update({ pin_order: index + 1 }).eq("id", row.id)
+    )
+  );
+}
+
+export async function setVideoPin(
+  id: string,
+  options: { pinned: boolean; pinOrder?: number | null },
+  adminId?: string,
+  adminName?: string
+): Promise<Video> {
+  const db = getSupabaseAdmin();
+
+  if (!options.pinned) {
+    const { error } = await db
+      .from("videos")
+      .update({
+        is_pinned: false,
+        pin_order: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    await compactPinOrders(db);
+
+    const { data: video, error: fetchError } = await db.from("videos").select("*").eq("id", id).single();
+    if (fetchError) throw new Error(fetchError.message);
+
+    if (adminId && adminName) {
+      await logActivity(adminId, adminName, "update", "video", "Unpinned video", id);
+    }
+    return mapVideo(video);
+  }
+
+  const { data: pinnedRows, error: pinnedError } = await db
+    .from("videos")
+    .select("id,pin_order")
+    .eq("is_pinned", true)
+    .neq("id", id)
+    .order("pin_order", { ascending: true });
+  if (pinnedError) throw new Error(pinnedError.message);
+
+  const others = pinnedRows ?? [];
+  let targetOrder = options.pinOrder;
+  if (targetOrder == null || !Number.isFinite(targetOrder) || targetOrder < 1) {
+    targetOrder =
+      others.length === 0 ? 1 : Math.max(...others.map((row) => row.pin_order ?? 0)) + 1;
+  }
+
+  const orderedIds = others
+    .sort((a, b) => (a.pin_order ?? 0) - (b.pin_order ?? 0))
+    .map((row) => row.id);
+  const insertAt = Math.min(Math.floor(targetOrder) - 1, orderedIds.length);
+  orderedIds.splice(insertAt, 0, id);
+
+  await Promise.all(
+    orderedIds.map((videoId, index) =>
+      db
+        .from("videos")
+        .update({
+          is_pinned: true,
+          pin_order: index + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", videoId)
+    )
+  );
+
+  const { data: video, error } = await db.from("videos").select("*").eq("id", id).single();
+  if (error) throw new Error(error.message);
+
+  if (adminId && adminName) {
+    await logActivity(
+      adminId,
+      adminName,
+      "update",
+      "video",
+      `Pinned video (#${video.pin_order ?? orderedIds.indexOf(id) + 1})`,
+      id
+    );
+  }
+  return mapVideo(video);
+}
+
 export async function listVideos(filters?: { search?: string; category?: string; isVip?: boolean }): Promise<Video[]> {
   const params = new URLSearchParams();
   params.set("select", "*");
@@ -171,7 +275,7 @@ export async function listVideos(filters?: { search?: string; category?: string;
         v.tags.some((t) => t.toLowerCase().includes(s))
     );
   }
-  return videos;
+  return sortVideosForAdmin(videos);
 }
 
 export async function createVideo(body: Partial<Video>, adminId: string, adminName: string): Promise<Video> {
@@ -250,6 +354,8 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     is_vip: isVip,
     vip_trial_seconds: vipTrialSeconds,
     is_featured: body.isFeatured ?? false,
+    is_pinned: body.isPinned ?? false,
+    pin_order: body.isPinned ? (body.pinOrder ?? null) : null,
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
     views: 0,
