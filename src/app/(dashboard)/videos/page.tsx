@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, ExternalLink, Film, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, Pin, ExternalLink, Film, Upload } from "lucide-react";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
@@ -41,6 +41,8 @@ const emptyVideo = {
   isVip: false,
   vipTrialSeconds: null as number | null,
   isFeatured: false,
+  isPinned: false,
+  pinOrder: null as number | null,
   autoplay: false,
   trialEnabled: false,
   trialDurationValue: 5,
@@ -177,6 +179,8 @@ export default function VideosPage() {
       isVip: video.isVip,
       vipTrialSeconds: video.vipTrialSeconds ?? null,
       isFeatured: video.isFeatured,
+      isPinned: video.isPinned,
+      pinOrder: video.pinOrder,
       autoplay: video.autoplay,
       trialEnabled: video.trialEnabled,
       trialDurationValue: video.trialDurationValue,
@@ -257,7 +261,13 @@ export default function VideosPage() {
     setForm({ ...form, tags: form.tags.filter((t) => t !== tag) });
   };
 
-  const videos = data?.data || [];
+  const videos = [...(data?.data || [])].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+    if (a.isPinned && b.isPinned) {
+      return (a.pinOrder ?? 9999) - (b.pinOrder ?? 9999);
+    }
+    return 0;
+  });
   const categories = categoriesData?.data || [];
   const allSelected = videos.length > 0 && videos.every((v) => selected.has(v.id));
   const selectedCount = videos.filter((v) => selected.has(v.id)).length;
@@ -404,6 +414,12 @@ export default function VideosPage() {
                             </Badge>
                           )}
                           {video.isVip && <Badge variant="default"><Crown className="h-3 w-3 mr-1" />VIP</Badge>}
+                          {video.isPinned && (
+                            <Badge variant="default">
+                              <Pin className="h-3 w-3 mr-1" />
+                              Pin #{video.pinOrder ?? "—"}
+                            </Badge>
+                          )}
                           {video.isFeatured && <Badge variant="warning"><Star className="h-3 w-3 mr-1" />Featured</Badge>}
                           {video.autoplay && <Badge variant="secondary">Autoplay</Badge>}
                           {!video.isVip && !video.isFeatured && !video.autoplay && !video.isPinned && (
@@ -640,6 +656,43 @@ export default function VideosPage() {
               <div className="flex items-center justify-between">
                 <Label>Featured</Label>
                 <Switch checked={form.isFeatured} onCheckedChange={(v) => setForm({ ...form, isFeatured: v })} />
+              </div>
+              <div className="space-y-3 rounded-lg border border-white/10 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Pin to homepage</Label>
+                    <p className="text-xs text-gray-500">Pinned videos appear first on the public homepage.</p>
+                  </div>
+                  <Switch
+                    checked={form.isPinned}
+                    onCheckedChange={(v) =>
+                      setForm({
+                        ...form,
+                        isPinned: v,
+                        pinOrder: v ? form.pinOrder : null,
+                      })
+                    }
+                  />
+                </div>
+                {form.isPinned && (
+                  <div className="space-y-2">
+                    <Label>Pin order</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="1 = top"
+                      value={form.pinOrder ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        setForm({
+                          ...form,
+                          pinOrder: value ? Number(value) : null,
+                        });
+                      }}
+                    />
+                    <p className="text-xs text-gray-500">Lower numbers appear first when multiple videos are pinned.</p>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between">
                 <Label>Autoplay preview on video cards</Label>
