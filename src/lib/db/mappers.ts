@@ -50,6 +50,7 @@ export function mapVideo(row: Record<string, any>): Video {
     trialEnabled: row.trial_enabled ?? false,
     trialDurationValue: row.trial_duration_value ?? 0,
     trialDurationUnit: row.trial_duration_unit ?? "minutes",
+    channel: row.channel ?? "VZW",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -79,6 +80,7 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.trialEnabled !== undefined) data.trial_enabled = video.trialEnabled;
   if (video.trialDurationValue !== undefined) data.trial_duration_value = video.trialDurationValue;
   if (video.trialDurationUnit !== undefined) data.trial_duration_unit = video.trialDurationUnit;
+  if (video.channel !== undefined) data.channel = video.channel;
   data.updated_at = new Date().toISOString();
   return data;
 }

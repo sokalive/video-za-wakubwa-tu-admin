@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, Pin, ExternalLink, Film, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, Pin, ExternalLink, Film, Upload, Layers } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
@@ -347,6 +348,11 @@ export default function VideosPage() {
                 <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedCount})
               </Button>
             )}
+            <Button variant="outline" asChild>
+              <Link href="/videos/bulk-upload">
+                <Layers className="h-4 w-4" /> Bulk Upload
+              </Link>
+            </Button>
             <Button onClick={openCreate}>
               <Plus className="h-4 w-4" /> Add Video
             </Button>

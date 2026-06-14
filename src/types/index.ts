@@ -45,6 +45,7 @@ export interface Video {
   trialEnabled: boolean;
   trialDurationValue: number;
   trialDurationUnit: TrialDurationUnit;
+  channel?: string;
   createdAt: string;
   updatedAt: string;
 }

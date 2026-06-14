@@ -330,7 +330,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     }
   }
 
-  const id = `vid-${Date.now()}`;
+  const id = `vid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const settings = await getSettings();
   let vipTrialSeconds: number | null = null;
   if (isVip) {
@@ -369,6 +369,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     trial_enabled: trialEnabled,
     trial_duration_value: trialDurationValue,
     trial_duration_unit: trialDurationUnit,
+    channel: body.channel?.trim() || "VZW",
     published: true,
   };
   const cols = await getVideoOptionalColumns();
