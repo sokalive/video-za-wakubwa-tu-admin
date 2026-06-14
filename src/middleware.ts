@@ -15,6 +15,7 @@ const publicPaths = [
   "/api/setup/migrate-video-pins",
   "/api/setup/migrate-video-schema",
   "/api/setup/catalog-audit",
+  "/api/setup/upload-audit",
   "/api/payments/checkout-providers",
   "/api/payments/sonicpesa/create-order",
   "/api/payments/sonicpesa/webhook",
