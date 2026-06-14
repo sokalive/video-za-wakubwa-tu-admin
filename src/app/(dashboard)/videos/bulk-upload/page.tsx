@@ -36,6 +36,11 @@ import {
   validateThumbnailFile,
   validateVideoFile,
 } from "@/lib/video-upload-validation";
+import {
+  computeFileSha256,
+  DUPLICATE_MESSAGE,
+  resolveUploadThumbnail,
+} from "@/lib/video-file-utils";
 import type { Video } from "@/types";
 
 type QueueStatus = "pending" | "uploading" | "creating" | "done" | "error" | "skipped";
@@ -201,6 +206,17 @@ export default function BulkUploadPage() {
     try {
       updateItem(item.id, { status: "uploading", progress: 0, error: undefined });
 
+      const fileHash = await computeFileSha256(item.file);
+      const duplicateCheck = await api.videos.checkDuplicate({
+        fileHash,
+        fileSize: item.file.size,
+        sourceFileName: item.file.name,
+      });
+      if (duplicateCheck.duplicate) {
+        updateItem(item.id, { status: "skipped", error: DUPLICATE_MESSAGE });
+        return;
+      }
+
       const { url, objectKey } = await api.r2.uploadVideo(item.file, (percent) => {
         updateItem(item.id, { progress: percent });
       });
@@ -208,6 +224,10 @@ export default function BulkUploadPage() {
       let thumbnailUrl = settings.defaultThumbnailUrl;
       if (item.customThumbnail) {
         const { url: thumbUrl } = await api.upload(item.customThumbnail, "thumbnails");
+        thumbnailUrl = thumbUrl;
+      } else if (!thumbnailUrl) {
+        const generated = await resolveUploadThumbnail(item.file);
+        const { url: thumbUrl } = await api.upload(generated, "thumbnails");
         thumbnailUrl = thumbUrl;
       }
 
@@ -223,6 +243,9 @@ export default function BulkUploadPage() {
         r2ObjectKey: objectKey,
         videoStorage: "r2",
         googleDriveUrl: "",
+        fileHash,
+        fileSize: item.file.size,
+        sourceFileName: item.file.name,
         isVip: settings.isVip,
         isFeatured: false,
         autoplay: false,

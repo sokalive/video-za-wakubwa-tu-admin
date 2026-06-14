@@ -28,6 +28,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatNumber } from "@/lib/utils";
 import { formatBytes } from "@/lib/r2-upload";
+import {
+  computeFileSha256,
+  DUPLICATE_MESSAGE,
+  resolveUploadThumbnail,
+} from "@/lib/video-file-utils";
 import type { TrialDurationUnit, Video, VideoStorage } from "@/types";
 import { TRIAL_DURATION_UNITS } from "@/lib/duration";
 
@@ -246,6 +251,18 @@ export default function VideosPage() {
         if (!r2Configured) {
           throw new Error(r2Status?.reason ?? "Cloudflare R2 is not configured on the server.");
         }
+
+        setSavePhase("Checking for duplicates...");
+        const fileHash = await computeFileSha256(videoFile);
+        const duplicateCheck = await api.videos.checkDuplicate({
+          fileHash,
+          fileSize: videoFile.size,
+          sourceFileName: videoFile.name,
+        });
+        if (duplicateCheck.duplicate) {
+          throw new Error(DUPLICATE_MESSAGE);
+        }
+
         setSavePhase("Uploading video to Cloudflare R2...");
         setUploadProgress(0);
         const { url, objectKey } = await api.r2.uploadVideo(videoFile, setUploadProgress);
@@ -253,6 +270,9 @@ export default function VideosPage() {
         payload.r2ObjectKey = objectKey;
         payload.videoStorage = "r2";
         payload.googleDriveUrl = "";
+        payload.fileHash = fileHash;
+        payload.fileSize = videoFile.size;
+        payload.sourceFileName = videoFile.name;
       } else if (!payload.videoUrl && !payload.googleDriveUrl) {
         throw new Error("Video file or existing video URL is required.");
       }
@@ -260,6 +280,11 @@ export default function VideosPage() {
       if (thumbnailFile) {
         setSavePhase("Uploading thumbnail...");
         const { url } = await api.upload(thumbnailFile, "thumbnails");
+        payload.thumbnailUrl = url;
+      } else if (videoFile && !payload.thumbnailUrl) {
+        setSavePhase("Generating thumbnail...");
+        const generated = await resolveUploadThumbnail(videoFile);
+        const { url } = await api.upload(generated, "thumbnails");
         payload.thumbnailUrl = url;
       }
 

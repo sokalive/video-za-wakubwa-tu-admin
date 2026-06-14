@@ -284,6 +284,66 @@ export async function listVideos(filters?: { search?: string; category?: string;
   return sortVideosForAdmin(videos);
 }
 
+const DUPLICATE_VIDEO_MESSAGE = "Video already exists.";
+
+export async function findDuplicateVideo(input: {
+  fileHash?: string;
+  r2ObjectKey?: string;
+  videoUrl?: string;
+  fileSize?: number;
+  sourceFileName?: string;
+}): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  const fileHash = String(input.fileHash ?? "").trim();
+  const r2ObjectKey = String(input.r2ObjectKey ?? "").trim();
+  const videoUrl = String(input.videoUrl ?? "").trim();
+  const sourceFileName = String(input.sourceFileName ?? "").trim();
+  const fileSize = input.fileSize;
+
+  if (r2ObjectKey) {
+    const { data } = await db
+      .from("videos")
+      .select("id")
+      .eq("r2_object_key", r2ObjectKey)
+      .limit(1)
+      .maybeSingle();
+    if (data) return true;
+  }
+
+  if (videoUrl) {
+    const { data } = await db
+      .from("videos")
+      .select("id")
+      .eq("video_url", videoUrl)
+      .limit(1)
+      .maybeSingle();
+    if (data) return true;
+  }
+
+  if (fileHash) {
+    const { data } = await db
+      .from("videos")
+      .select("id")
+      .eq("file_hash", fileHash)
+      .limit(1)
+      .maybeSingle();
+    if (data) return true;
+  }
+
+  if (fileSize && sourceFileName) {
+    const { data } = await db
+      .from("videos")
+      .select("id")
+      .eq("file_size", fileSize)
+      .eq("source_file_name", sourceFileName)
+      .limit(1)
+      .maybeSingle();
+    if (data) return true;
+  }
+
+  return false;
+}
+
 export async function createVideo(body: Partial<Video>, adminId: string, adminName: string): Promise<Video> {
   const db = getSupabaseAdmin();
   let categoryName = body.categoryName ?? "";
@@ -314,6 +374,17 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     videoStorage = "google_drive";
   } else {
     throw new Error("Invalid video source. Upload a file to R2.");
+  }
+
+  const duplicate = await findDuplicateVideo({
+    fileHash: body.fileHash,
+    r2ObjectKey: storedR2Key,
+    videoUrl: storedVideoUrl,
+    fileSize: body.fileSize,
+    sourceFileName: body.sourceFileName,
+  });
+  if (duplicate) {
+    throw new Error(DUPLICATE_VIDEO_MESSAGE);
   }
 
   const isVip = body.isVip ?? false;
@@ -370,6 +441,9 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     trial_duration_value: trialDurationValue,
     trial_duration_unit: trialDurationUnit,
     channel: body.channel?.trim() || "VZW",
+    file_hash: body.fileHash ?? null,
+    file_size: body.fileSize ?? null,
+    source_file_name: body.sourceFileName ?? null,
     published: true,
   };
   const cols = await getVideoOptionalColumns();

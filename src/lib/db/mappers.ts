@@ -51,6 +51,9 @@ export function mapVideo(row: Record<string, any>): Video {
     trialDurationValue: row.trial_duration_value ?? 0,
     trialDurationUnit: row.trial_duration_unit ?? "minutes",
     channel: row.channel ?? "VZW",
+    fileHash: row.file_hash ?? undefined,
+    fileSize: row.file_size ?? undefined,
+    sourceFileName: row.source_file_name ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -81,6 +84,9 @@ export function mapVideoToDb(video: Partial<Video>): Record<string, unknown> {
   if (video.trialDurationValue !== undefined) data.trial_duration_value = video.trialDurationValue;
   if (video.trialDurationUnit !== undefined) data.trial_duration_unit = video.trialDurationUnit;
   if (video.channel !== undefined) data.channel = video.channel;
+  if (video.fileHash !== undefined) data.file_hash = video.fileHash;
+  if (video.fileSize !== undefined) data.file_size = video.fileSize;
+  if (video.sourceFileName !== undefined) data.source_file_name = video.sourceFileName;
   data.updated_at = new Date().toISOString();
   return data;
 }

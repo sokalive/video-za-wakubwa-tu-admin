@@ -46,6 +46,9 @@ export interface Video {
   trialDurationValue: number;
   trialDurationUnit: TrialDurationUnit;
   channel?: string;
+  fileHash?: string;
+  fileSize?: number;
+  sourceFileName?: string;
   createdAt: string;
   updatedAt: string;
 }

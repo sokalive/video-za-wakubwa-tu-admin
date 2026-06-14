@@ -50,6 +50,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify(video),
       }),
+    checkDuplicate: (input: {
+      fileHash?: string;
+      fileSize?: number;
+      sourceFileName?: string;
+      r2ObjectKey?: string;
+      videoUrl?: string;
+    }) =>
+      fetchApi<{ success: boolean; duplicate: boolean }>("/videos/check-duplicate", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
     update: (id: string, video: Partial<import("@/types").Video>) =>
       fetchApi<{ success: boolean; data: import("@/types").Video }>(`/videos/${id}`, {
         method: "PUT",
