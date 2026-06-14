@@ -320,9 +320,9 @@ export default function VideosPage() {
   return (
     <DashboardShell title="Videos">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between">
-          <div className="flex gap-3 flex-1">
-            <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4 sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-1 min-w-0">
+            <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
               <Input
                 placeholder="Search videos..."
@@ -342,19 +342,21 @@ export default function VideosPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 shrink-0">
             {selectedCount > 0 && (
-              <Button variant="destructive" onClick={() => setBulkConfirmOpen(true)}>
-                <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedCount})
+              <Button variant="destructive" size="sm" className="touch-manipulation" onClick={() => setBulkConfirmOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Delete</span> ({selectedCount})
               </Button>
             )}
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" className="touch-manipulation" asChild>
               <Link href="/videos/bulk-upload">
-                <Layers className="h-4 w-4" /> Bulk Upload
+                <Layers className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Bulk Upload</span>
               </Link>
             </Button>
-            <Button onClick={openCreate}>
-              <Plus className="h-4 w-4" /> Add Video
+            <Button size="sm" className="touch-manipulation" onClick={openCreate}>
+              <Plus className="h-4 w-4 sm:mr-1" /> Add Video
             </Button>
           </div>
         </div>
@@ -376,26 +378,28 @@ export default function VideosPage() {
                 No videos found. Click &quot;Add Video&quot; to upload your first video.
               </div>
             ) : (
-              <Table>
+              <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[88px]">Thumbnail</TableHead>
+                    <TableHead className="sticky left-0 z-10 w-[72px] bg-[#12121f] sm:w-[88px]">
+                      Thumbnail
+                    </TableHead>
                     <TableHead className="w-10">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all videos" />
                     </TableHead>
-                    <TableHead>Video</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Views</TableHead>
-                    <TableHead>Likes</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="min-w-[140px]">Video</TableHead>
+                    <TableHead className="hidden md:table-cell">Category</TableHead>
+                    <TableHead className="hidden lg:table-cell">Source</TableHead>
+                    <TableHead className="hidden sm:table-cell">Views</TableHead>
+                    <TableHead className="hidden sm:table-cell">Likes</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {videos.map((video) => (
                     <TableRow key={video.id}>
-                      <TableCell className="py-2">
+                      <TableCell className="sticky left-0 z-10 bg-[#12121f] py-2">
                         <VideoThumbnailCell video={video} onEdit={() => openEdit(video)} />
                       </TableCell>
                       <TableCell>
@@ -414,8 +418,8 @@ export default function VideosPage() {
                           <p className="text-xs text-gray-500 line-clamp-1">{video.description}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{video.categoryName}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">{video.categoryName}</TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {playbackLink(video) ? (
                           <a
                             href={playbackLink(video)}
@@ -428,8 +432,8 @@ export default function VideosPage() {
                           </a>
                         ) : "—"}
                       </TableCell>
-                      <TableCell>{formatNumber(video.views)}</TableCell>
-                      <TableCell>{formatNumber(video.likesCount)}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{formatNumber(video.views)}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{formatNumber(video.likesCount)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {video.isPinned && (
@@ -474,10 +478,11 @@ export default function VideosPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1 sm:gap-2 flex-wrap">
                           <Button
                             variant={video.isPinned ? "secondary" : "ghost"}
-                            size="sm"
+                            size="icon"
+                            className="h-9 w-9 touch-manipulation sm:h-8 sm:w-auto sm:px-3"
                             title={video.isPinned ? "Unpin video" : "Pin video"}
                             disabled={pinMutation.isPending}
                             onClick={() =>
@@ -487,17 +492,26 @@ export default function VideosPage() {
                               })
                             }
                           >
-                            📌 {video.isPinned ? "Unpin" : "Pin"}
+                            <span className="sm:mr-1">📌</span>
+                            <span className="hidden sm:inline">{video.isPinned ? "Unpin" : "Pin"}</span>
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(video)}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 touch-manipulation"
+                            onClick={() => openEdit(video)}
+                            title="Edit video"
+                          >
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-9 w-9 touch-manipulation"
                             onClick={() => {
                               if (confirm("Delete this video?")) deleteMutation.mutate(video.id);
                             }}
+                            title="Delete video"
                           >
                             <Trash2 className="h-4 w-4 text-red-400" />
                           </Button>
