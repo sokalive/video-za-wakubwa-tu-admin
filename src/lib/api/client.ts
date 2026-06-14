@@ -53,6 +53,7 @@ export const api = {
     checkDuplicate: (input: {
       fileHash?: string;
       fileSize?: number;
+      sourceFileName?: string;
       r2ObjectKey?: string;
       videoUrl?: string;
     }) =>
