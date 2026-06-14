@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCatalogAuditReport, publishAllEligibleVideos } from "@/lib/db/catalog-audit";
+import { getCatalogAuditReport, fixNullIsPinnedFlags } from "@/lib/db/catalog-audit";
 import { isDbConfigured } from "@/lib/db/client";
 
 export async function GET() {
@@ -24,9 +24,9 @@ export async function POST() {
   }
 
   try {
-    const result = await publishAllEligibleVideos();
+    const pinnedFix = await fixNullIsPinnedFlags();
     const audit = await getCatalogAuditReport();
-    return NextResponse.json({ success: true, ...result, audit });
+    return NextResponse.json({ success: true, pinnedFix, audit });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: err instanceof Error ? err.message : "Publish failed" },
