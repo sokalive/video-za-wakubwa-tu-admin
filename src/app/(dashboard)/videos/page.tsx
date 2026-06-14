@@ -257,7 +257,6 @@ export default function VideosPage() {
         const duplicateCheck = await api.videos.checkDuplicate({
           fileHash,
           fileSize: videoFile.size,
-          sourceFileName: videoFile.name,
         });
         if (duplicateCheck.duplicate) {
           throw new Error(DUPLICATE_MESSAGE);
