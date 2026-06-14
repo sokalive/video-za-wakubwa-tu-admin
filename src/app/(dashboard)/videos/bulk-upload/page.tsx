@@ -217,10 +217,7 @@ export default function BulkUploadPage() {
       }
       batchHashes.add(fileHash);
 
-      const duplicateCheck = await api.videos.checkDuplicate({
-        fileHash,
-        fileSize: item.file.size,
-      });
+      const duplicateCheck = await api.videos.checkDuplicate({ fileHash });
       if (duplicateCheck.duplicate) {
         batchHashes.delete(fileHash);
         updateItem(item.id, { status: "skipped", error: DUPLICATE_MESSAGE });

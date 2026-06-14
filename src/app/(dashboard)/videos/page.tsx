@@ -254,10 +254,7 @@ export default function VideosPage() {
 
         setSavePhase("Checking for duplicates...");
         const fileHash = await computeFileSha256(videoFile);
-        const duplicateCheck = await api.videos.checkDuplicate({
-          fileHash,
-          fileSize: videoFile.size,
-        });
+        const duplicateCheck = await api.videos.checkDuplicate({ fileHash });
         if (duplicateCheck.duplicate) {
           throw new Error(DUPLICATE_MESSAGE);
         }

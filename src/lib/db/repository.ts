@@ -290,14 +290,12 @@ export async function findDuplicateVideo(input: {
   fileHash?: string;
   r2ObjectKey?: string;
   videoUrl?: string;
-  fileSize?: number;
 }): Promise<boolean> {
   const db = getSupabaseAdmin();
   const cols = await getVideoOptionalColumns();
   const fileHash = String(input.fileHash ?? "").trim();
   const r2ObjectKey = String(input.r2ObjectKey ?? "").trim();
   const videoUrl = String(input.videoUrl ?? "").trim();
-  const fileSize = input.fileSize;
 
   if (r2ObjectKey) {
     const { data } = await db
@@ -368,7 +366,6 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     fileHash: body.fileHash,
     r2ObjectKey: storedR2Key,
     videoUrl: storedVideoUrl,
-    fileSize: body.fileSize,
   });
   if (duplicate) {
     throw new Error(DUPLICATE_VIDEO_MESSAGE);

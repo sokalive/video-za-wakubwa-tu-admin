@@ -19,7 +19,6 @@ export async function POST(request: Request) {
       fileHash: body.fileHash,
       r2ObjectKey: body.r2ObjectKey,
       videoUrl: body.videoUrl,
-      fileSize: body.fileSize,
     });
 
     return NextResponse.json({ success: true, duplicate });
