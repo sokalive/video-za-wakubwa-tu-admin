@@ -30,6 +30,33 @@ import { formatBytes } from "@/lib/r2-upload";
 import type { TrialDurationUnit, Video, VideoStorage } from "@/types";
 import { TRIAL_DURATION_UNITS } from "@/lib/duration";
 
+const THUMBNAIL_PLACEHOLDER = "/video-thumbnail-placeholder.svg";
+
+function VideoThumbnailCell({ video, onEdit }: { video: Video; onEdit: () => void }) {
+  const [broken, setBroken] = useState(false);
+  const src = video.thumbnailUrl && !broken ? video.thumbnailUrl : THUMBNAIL_PLACEHOLDER;
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      title={`Edit ${video.title}`}
+      className="group block shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10 transition hover:ring-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <Image
+        src={src}
+        alt={`${video.title} thumbnail`}
+        width={80}
+        height={45}
+        loading="lazy"
+        sizes="80px"
+        className="aspect-video h-[45px] w-[64px] object-cover bg-white/5 sm:h-[45px] sm:w-[80px]"
+        onError={() => setBroken(true)}
+      />
+    </button>
+  );
+}
+
 const emptyVideo = {
   title: "",
   description: "",
@@ -346,6 +373,7 @@ export default function VideosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[88px]">Thumbnail</TableHead>
                     <TableHead className="w-10">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all videos" />
                     </TableHead>
@@ -361,6 +389,9 @@ export default function VideosPage() {
                 <TableBody>
                   {videos.map((video) => (
                     <TableRow key={video.id}>
+                      <TableCell className="py-2">
+                        <VideoThumbnailCell video={video} onEdit={() => openEdit(video)} />
+                      </TableCell>
                       <TableCell>
                         <Checkbox
                           checked={selected.has(video.id)}
@@ -369,25 +400,12 @@ export default function VideosPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-3">
-                          {video.thumbnailUrl ? (
-                            <Image
-                              src={video.thumbnailUrl}
-                              alt={video.title}
-                              width={80}
-                              height={45}
-                              className="rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="h-[45px] w-[80px] rounded-lg bg-white/10" />
-                          )}
-                          <div>
-                            <p className="font-medium text-white flex items-center gap-2">
-                              {video.isPinned && <span title="Pinned">📌</span>}
-                              {video.title}
-                            </p>
-                            <p className="text-xs text-gray-500 line-clamp-1">{video.description}</p>
-                          </div>
+                        <div>
+                          <p className="font-medium text-white flex items-center gap-2">
+                            {video.isPinned && <span title="Pinned">📌</span>}
+                            {video.title}
+                          </p>
+                          <p className="text-xs text-gray-500 line-clamp-1">{video.description}</p>
                         </div>
                       </TableCell>
                       <TableCell>{video.categoryName}</TableCell>
