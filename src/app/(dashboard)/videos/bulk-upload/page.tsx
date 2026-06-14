@@ -199,20 +199,30 @@ export default function BulkUploadPage() {
       categoryId: string;
       isVip: boolean;
       defaultThumbnailUrl: string;
-    }
+    },
+    batchHashes: Set<string>
   ) => {
     if (item.status === "error" && item.error?.includes("Unsupported")) return;
+
+    let fileHash = "";
 
     try {
       updateItem(item.id, { status: "uploading", progress: 0, error: undefined });
 
-      const fileHash = await computeFileSha256(item.file);
+      fileHash = await computeFileSha256(item.file);
+
+      if (batchHashes.has(fileHash)) {
+        updateItem(item.id, { status: "skipped", error: DUPLICATE_MESSAGE });
+        return;
+      }
+      batchHashes.add(fileHash);
+
       const duplicateCheck = await api.videos.checkDuplicate({
         fileHash,
         fileSize: item.file.size,
-        sourceFileName: item.file.name,
       });
       if (duplicateCheck.duplicate) {
+        batchHashes.delete(fileHash);
         updateItem(item.id, { status: "skipped", error: DUPLICATE_MESSAGE });
         return;
       }
@@ -254,6 +264,7 @@ export default function BulkUploadPage() {
       await api.videos.create(payload);
       updateItem(item.id, { status: "done", progress: 100 });
     } catch (err) {
+      if (fileHash) batchHashes.delete(fileHash);
       updateItem(item.id, {
         status: "error",
         error: err instanceof Error ? err.message : "Upload failed",
@@ -297,10 +308,11 @@ export default function BulkUploadPage() {
       };
 
       const work = queue.filter((q) => q.status === "pending");
+      const batchHashes = new Set<string>();
 
       for (let i = 0; i < work.length; i += BULK_UPLOAD_CONCURRENCY) {
         const batch = work.slice(i, i + BULK_UPLOAD_CONCURRENCY);
-        await Promise.all(batch.map((item) => processOne(item, settings)));
+        await Promise.all(batch.map((item) => processOne(item, settings, batchHashes)));
       }
 
       await queryClient.invalidateQueries({ queryKey: ["videos"] });

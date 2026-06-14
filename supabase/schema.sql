@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS videos (
   vip_trial_seconds INT,
   rating INT NOT NULL DEFAULT 75,
   channel TEXT DEFAULT 'VZW',
+  file_hash TEXT,
+  file_size BIGINT,
+  source_file_name TEXT,
   tags TEXT[] DEFAULT '{}',
   published BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -72,6 +75,9 @@ CREATE INDEX IF NOT EXISTS idx_videos_featured ON videos(is_featured);
 CREATE INDEX IF NOT EXISTS idx_videos_pinned ON videos(is_pinned, pin_order);
 CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_published ON videos(published);
+CREATE INDEX IF NOT EXISTS idx_videos_file_hash ON videos(file_hash) WHERE file_hash IS NOT NULL AND file_hash <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_videos_r2_object_key_unique ON videos(r2_object_key) WHERE r2_object_key IS NOT NULL AND r2_object_key <> '';
+CREATE INDEX IF NOT EXISTS idx_videos_file_size_name ON videos(file_size, source_file_name) WHERE file_size IS NOT NULL AND source_file_name IS NOT NULL AND source_file_name <> '';
 
 -- ============================================================
 -- VIP PLANS

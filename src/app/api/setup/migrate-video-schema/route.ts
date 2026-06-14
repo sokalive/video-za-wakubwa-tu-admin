@@ -4,8 +4,10 @@ import { sanitizeEnv } from "@/lib/env";
 import { isDbConfigured } from "@/lib/db/client";
 import {
   getVideoSchemaMigrationSql,
+  getVideoDedupMigrationSql,
   probeVideoSchemaColumns,
   VIDEO_SCHEMA_MIGRATION_FILES,
+  VIDEO_DEDUP_MIGRATION_FILE,
 } from "@/lib/db/video-schema-migration";
 import { buildSupabaseDatabaseUrl } from "@/lib/db/supabase-database-url";
 import { invalidateVideoColumnCache } from "@/lib/db/video-schema";
@@ -40,9 +42,12 @@ export async function GET() {
     videoSchemaReady: probe.ready,
     vipTrialSecondsReady: probe.vipTrialSecondsReady,
     pinColumnsReady: probe.pinColumnsReady,
+    dedupColumnsReady: probe.dedupColumnsReady,
     migrationFiles: VIDEO_SCHEMA_MIGRATION_FILES,
+    dedupMigrationFile: VIDEO_DEDUP_MIGRATION_FILE,
     probeError: probe.error,
     sql: probe.ready ? null : getVideoSchemaMigrationSql(),
+    dedupMigrationSql: probe.dedupColumnsReady ? null : getVideoDedupMigrationSql(),
   });
 }
 
@@ -62,7 +67,13 @@ export async function POST(request: Request) {
 
   const before = await probeVideoSchemaColumns();
   if (before.ready) {
-    return NextResponse.json({ success: true, alreadyApplied: true, videoSchemaReady: true, ...before });
+    return NextResponse.json({
+      success: true,
+      alreadyApplied: true,
+      videoSchemaReady: true,
+      ...before,
+      dedupMigrationSql: null,
+    });
   }
 
   const databaseUrl = buildSupabaseDatabaseUrl();

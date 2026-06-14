@@ -11,6 +11,7 @@ const projectRef = "ouknrrrgnqwdadfbxqwr";
 const migrationFiles = [
   "010_video_pins.sql",
   "011_video_vip_trial_seconds.sql",
+  "017_video_dedup_metadata.sql",
 ];
 
 for (const envPath of [
