@@ -147,7 +147,8 @@ async function syncCategoryVideoCount(db: ReturnType<typeof getSupabaseAdmin>, c
   const { count } = await db
     .from("videos")
     .select("*", { count: "exact", head: true })
-    .eq("category_id", categoryId);
+    .eq("category_id", categoryId)
+    .eq("published", true);
   await db.from("categories").update({ video_count: count ?? 0 }).eq("id", categoryId);
 }
 
@@ -558,7 +559,7 @@ export async function listCategories(): Promise<Category[]> {
   const db = getSupabaseAdmin();
   const [{ data: categories }, { data: videos }] = await Promise.all([
     db.from("categories").select("*").order("name"),
-    db.from("videos").select("category_id"),
+    db.from("videos").select("category_id, published").eq("published", true),
   ]);
 
   const counts = new Map<string, number>();

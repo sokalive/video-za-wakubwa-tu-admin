@@ -115,9 +115,10 @@ export default function BulkUploadPage() {
   const stats = useMemo(() => {
     const total = queue.length;
     const done = queue.filter((q) => q.status === "done").length;
+    const skipped = queue.filter((q) => q.status === "skipped").length;
     const failed = queue.filter((q) => q.status === "error").length;
     const pending = queue.filter((q) => q.status === "pending").length;
-    return { total, done, failed, pending };
+    return { total, done, skipped, failed, pending };
   }, [queue]);
 
   const updateItem = useCallback((id: string, patch: Partial<QueueItem>) => {
@@ -330,8 +331,11 @@ export default function BulkUploadPage() {
           </Button>
           {stats.total > 0 && (
             <div className="flex flex-wrap gap-2 text-sm text-gray-400">
-              <span>{stats.total} in queue</span>
-              <span className="text-green-400">{stats.done} done</span>
+              <span>{stats.total} in queue (not database total)</span>
+              <span className="text-green-400">{stats.done} saved to database</span>
+              {stats.skipped > 0 && (
+                <span className="text-yellow-400">{stats.skipped} skipped duplicates</span>
+              )}
               {stats.failed > 0 && <span className="text-red-400">{stats.failed} failed</span>}
             </div>
           )}
