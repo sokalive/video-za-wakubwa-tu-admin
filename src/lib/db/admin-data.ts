@@ -244,6 +244,7 @@ export async function computeDashboardStatsFromDb(): Promise<DashboardStats> {
 
 export async function computeAnalyticsFromDb(): Promise<AnalyticsData> {
   const db = getSupabaseAdmin();
+  const revenueResetAt = await getRevenueResetAt();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   const twelveWeeksAgo = new Date();
@@ -323,6 +324,7 @@ export async function computeAnalyticsFromDb(): Promise<AnalyticsData> {
     revenueByDate.set(date, 0);
   }
   for (const t of txns) {
+    if (!transactionCountsTowardRevenue(t.created_at, t.status, revenueResetAt)) continue;
     const key = dateKey(t.created_at);
     revenueByDate.set(key, (revenueByDate.get(key) ?? 0) + (t.amount ?? 0));
   }

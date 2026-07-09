@@ -39,6 +39,7 @@ export default function PaymentsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["payments", statusFilter],
@@ -68,11 +69,19 @@ export default function PaymentsPage() {
 
   const resetRevenueMutation = useMutation({
     mutationFn: () => api.payments.resetRevenue(),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setResetError(null);
       setResetConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["payments"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.setQueriesData<{ success: boolean; data: typeof payments; stats?: typeof stats }>(
+        { queryKey: ["payments"] },
+        (old) => (old ? { ...old, stats: result.stats } : old)
+      );
+      void queryClient.invalidateQueries({ queryKey: ["payments"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+    onError: (err: Error) => {
+      setResetError(err.message || "Revenue reset failed");
     },
   });
 
@@ -139,7 +148,10 @@ export default function PaymentsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setResetConfirmOpen(true)}
+            onClick={() => {
+              setResetError(null);
+              setResetConfirmOpen(true);
+            }}
             disabled={resetRevenueMutation.isPending}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -245,6 +257,11 @@ export default function PaymentsPage() {
               zinabaki kwenye mfumo — hakuna malipo yanayofutwa au kubadilishwa.
             </DialogDescription>
           </DialogHeader>
+          {resetError && (
+            <p className="text-sm text-red-400" role="alert">
+              {resetError}
+            </p>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>
               Ghairi
