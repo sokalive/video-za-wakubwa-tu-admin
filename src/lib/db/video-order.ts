@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/db/client";
 import { supabaseRest } from "@/lib/db/rest";
+import { buildSupabaseDatabaseUrl } from "@/lib/db/supabase-database-url";
 
 export function compareVideoDisplayOrder(
   a: { displayOrder?: number | null; createdAt?: string; id: string },
@@ -43,6 +44,28 @@ export async function reorderVideos(orderedIds: string[]): Promise<{ updated: nu
   }
 
   const now = new Date().toISOString();
+  const databaseUrl = buildSupabaseDatabaseUrl();
+
+  if (databaseUrl) {
+    const postgres = (await import("postgres")).default;
+    const sql = postgres(databaseUrl, { ssl: "require", max: 1 });
+    try {
+      await sql.begin(async (tx) => {
+        for (let index = 0; index < unique.length; index++) {
+          const id = unique[index];
+          await tx`
+            UPDATE videos
+            SET display_order = ${index + 1}, updated_at = ${now}
+            WHERE id = ${id}
+          `;
+        }
+      });
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
+    return { updated: unique.length };
+  }
+
   await Promise.all(
     unique.map((id, index) =>
       supabaseRest(`videos?id=eq.${encodeURIComponent(id)}`, {
