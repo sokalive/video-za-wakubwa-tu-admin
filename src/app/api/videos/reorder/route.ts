@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const orderedIds = Array.isArray(body.orderedIds) ? body.orderedIds.map(String) : [];
-    const result = await reorderVideos(orderedIds, session.adminId, session.name);
+    const result = await reorderVideos(orderedIds);
     await logActivity(
       session.adminId,
       session.name,

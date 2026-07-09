@@ -26,11 +26,7 @@ export async function getNextDisplayOrder(): Promise<number> {
   return (data?.display_order ?? 0) + 1;
 }
 
-export async function reorderVideos(
-  orderedIds: string[],
-  _adminId: string,
-  _adminName: string
-): Promise<{ updated: number }> {
+export async function reorderVideos(orderedIds: string[]): Promise<{ updated: number }> {
   const unique = [...new Set(orderedIds.map((id) => String(id).trim()).filter(Boolean))];
   if (unique.length === 0) throw new Error("orderedIds is required");
 
