@@ -305,6 +305,11 @@ export async function handleSonicpesaWebhook(
       return { status: 200 };
     }
     if (txn.status === "completed") {
+      await billing.tryActivateDeviceSubscriptionFromCompletedTxn({
+        ...txn,
+        status: "completed",
+        order_id: merchantOrderId,
+      });
       return { status: 200 };
     }
     const ok = sonicPaymentSucceeded(body);

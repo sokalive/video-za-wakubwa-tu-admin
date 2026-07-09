@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, CreditCard, TrendingUp, RefreshCw, Clock, XCircle, Trash2 } from "lucide-react";
+import { DollarSign, CreditCard, TrendingUp, RefreshCw, Clock, XCircle, Trash2, RotateCcw } from "lucide-react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { BulkDeleteDialog } from "@/components/admin/bulk-delete-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartCard } from "@/components/dashboard/charts";
 import { api } from "@/lib/api/client";
@@ -30,6 +38,7 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ["payments", statusFilter],
@@ -54,6 +63,16 @@ export default function PaymentsPage() {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["analytics"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+
+  const resetRevenueMutation = useMutation({
+    mutationFn: () => api.payments.resetRevenue(),
+    onSuccess: () => {
+      setResetConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
     },
   });
 
@@ -88,8 +107,14 @@ export default function PaymentsPage() {
     });
   };
 
+  const revenueResetAt = stats?.revenueResetAt ? new Date(stats.revenueResetAt).getTime() : null;
+
   const revenueChart = payments
-    .filter((p) => p.status === "completed")
+    .filter((p) => {
+      if (p.status !== "completed") return false;
+      if (!revenueResetAt) return true;
+      return new Date(p.createdAt).getTime() >= revenueResetAt;
+    })
     .reduce<{ date: string; revenue: number }[]>((acc, p) => {
       const date = p.createdAt.split("T")[0];
       const existing = acc.find((a) => a.date === date);
@@ -111,6 +136,15 @@ export default function PaymentsPage() {
           ) : (
             <div />
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetConfirmOpen(true)}
+            disabled={resetRevenueMutation.isPending}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Anza Hesabu Upya
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -146,7 +180,12 @@ export default function PaymentsPage() {
         </div>
 
         {stats?.recalculatedAt && (
-          <p className="text-xs text-gray-500">Last calculated: {formatDate(stats.recalculatedAt)}</p>
+          <p className="text-xs text-gray-500">
+            Last calculated: {formatDate(stats.recalculatedAt)}
+            {stats.revenueResetAt && (
+              <> · Revenue baseline: {formatDate(stats.revenueResetAt)} (UTC)</>
+            )}
+          </p>
         )}
 
         <Tabs
@@ -196,6 +235,29 @@ export default function PaymentsPage() {
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate([...selected])}
       />
+
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anza Hesabu Upya</DialogTitle>
+            <DialogDescription>
+              Hii itaanzisha hesabu ya mapato kutoka sifuri kwa onyesho la sasa. Rekodi zote za malipo
+              zinabaki kwenye mfumo — hakuna malipo yanayofutwa au kubadilishwa.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setResetConfirmOpen(false)}>
+              Ghairi
+            </Button>
+            <Button
+              onClick={() => resetRevenueMutation.mutate()}
+              disabled={resetRevenueMutation.isPending}
+            >
+              {resetRevenueMutation.isPending ? "Inasubiri..." : "Anza kutoka 0"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }

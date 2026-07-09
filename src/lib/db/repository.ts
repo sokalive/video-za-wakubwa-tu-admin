@@ -30,6 +30,7 @@ import {
   computeDashboardStats,
   computeAnalytics,
 } from "./mappers";
+import { compareVideoDisplayOrder, getNextDisplayOrder } from "./video-order";
 import type {
   Admin,
   Video,
@@ -140,15 +141,12 @@ export async function listVideoLikeStats(limit = 50): Promise<VideoLikeStat[]> {
   return (data ?? []).map(mapVideoLikeStat);
 }
 
-// ─── Videos ─────────────────────────────────────────────────
-
 async function syncCategoryVideoCount(db: ReturnType<typeof getSupabaseAdmin>, categoryId: string): Promise<void> {
   if (!categoryId) return;
   const { count } = await db
     .from("videos")
     .select("*", { count: "exact", head: true })
-    .eq("category_id", categoryId)
-    .eq("published", true);
+    .eq("category_id", categoryId);
   await db.from("categories").update({ video_count: count ?? 0 }).eq("id", categoryId);
 }
 
@@ -157,12 +155,16 @@ async function syncCategoryVideoCounts(db: ReturnType<typeof getSupabaseAdmin>, 
   await Promise.all(uniqueIds.map((categoryId) => syncCategoryVideoCount(db, categoryId)));
 }
 
-function sortVideosForAdmin(videos: Video[]): Video[] {
+function sortVideosLegacy(videos: Video[]): Video[] {
   return [...videos].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
     if (a.isPinned && b.isPinned) return (a.pinOrder ?? 999) - (b.pinOrder ?? 999);
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+}
+
+function sortVideosForAdmin(videos: Video[]): Video[] {
+  return [...videos].sort(compareVideoDisplayOrder);
 }
 
 async function compactPinOrders(db: ReturnType<typeof getSupabaseAdmin>): Promise<void> {
@@ -263,9 +265,13 @@ export async function setVideoPin(
 
 
 export async function listVideos(filters?: { search?: string; category?: string; isVip?: boolean }): Promise<Video[]> {
+  const cols = await getVideoOptionalColumns();
   const params = new URLSearchParams();
   params.set("select", "*");
-  params.set("order", "created_at.desc");
+  params.set(
+    "order",
+    cols.displayOrder ? "display_order.asc,created_at.asc,id.asc" : "created_at.desc"
+  );
   if (filters?.category) params.set("category_id", `eq.${filters.category}`);
   if (filters?.isVip !== undefined) params.set("is_vip", `eq.${filters.isVip}`);
 
@@ -282,7 +288,7 @@ export async function listVideos(filters?: { search?: string; category?: string;
         v.tags.some((t) => t.toLowerCase().includes(s))
     );
   }
-  return sortVideosForAdmin(videos);
+  return cols.displayOrder ? sortVideosForAdmin(videos) : sortVideosLegacy(videos);
 }
 
 const DUPLICATE_VIDEO_MESSAGE = "Video already exists.";
@@ -388,6 +394,8 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
 
   const id = `vid-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const settings = await getSettings();
+  const cols = await getVideoOptionalColumns();
+  const displayOrder = cols.displayOrder ? await getNextDisplayOrder() : undefined;
   let vipTrialSeconds: number | null = null;
   if (isVip) {
     if (body.vipTrialSeconds !== undefined && body.vipTrialSeconds !== null) {
@@ -418,6 +426,7 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     is_featured: body.isFeatured ?? false,
     is_pinned: body.isPinned ?? false,
     pin_order: body.isPinned ? (body.pinOrder ?? null) : null,
+    ...(displayOrder !== undefined ? { display_order: displayOrder } : {}),
     autoplay: body.autoplay ?? false,
     tags: body.tags ?? [],
     views: 0,
@@ -431,7 +440,6 @@ export async function createVideo(body: Partial<Video>, adminId: string, adminNa
     source_file_name: body.sourceFileName ?? null,
     published: true,
   };
-  const cols = await getVideoOptionalColumns();
   const payload = prepareVideoWriteRow(row, cols);
   const { data, error } = await supabaseRest<Record<string, unknown>[]>("videos", {
     method: "POST",
@@ -559,7 +567,7 @@ export async function listCategories(): Promise<Category[]> {
   const db = getSupabaseAdmin();
   const [{ data: categories }, { data: videos }] = await Promise.all([
     db.from("categories").select("*").order("name"),
-    db.from("videos").select("category_id, published").eq("published", true),
+    db.from("videos").select("category_id"),
   ]);
 
   const counts = new Map<string, number>();

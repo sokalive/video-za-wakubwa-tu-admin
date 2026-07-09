@@ -5,6 +5,7 @@ import { getS3Client } from "@/lib/r2-list";
 import { syncAllCategoryVideoCounts } from "@/lib/db/category-sync";
 import { getCatalogAuditReport } from "@/lib/db/catalog-audit";
 import { getVideoOptionalColumns, prepareVideoWriteRow } from "@/lib/db/video-schema";
+import { getNextDisplayOrder } from "@/lib/db/video-order";
 import { supabaseRest } from "@/lib/db/rest";
 
 export type UploadAuditReport = {
@@ -199,6 +200,7 @@ export async function repairUploadAudit(): Promise<{
 
   const cols = await getVideoOptionalColumns(true);
   let createdFromR2 = 0;
+  let nextDisplayOrder = cols.displayOrder ? await getNextDisplayOrder() : null;
 
   for (const orphan of orphanObjects) {
     const videoUrl = getPublicObjectUrl(orphan.key);
@@ -233,6 +235,7 @@ export async function repairUploadAudit(): Promise<{
       published: true,
       file_size: orphan.size || null,
       source_file_name: orphan.key.split("/").pop() ?? null,
+      ...(nextDisplayOrder != null ? { display_order: nextDisplayOrder++ } : {}),
     };
 
     const payload = prepareVideoWriteRow(row, cols);

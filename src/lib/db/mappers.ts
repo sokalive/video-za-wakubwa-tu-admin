@@ -43,6 +43,7 @@ export function mapVideo(row: Record<string, any>): Video {
     isFeatured: row.is_featured ?? false,
     isPinned: row.is_pinned ?? false,
     pinOrder: row.pin_order ?? null,
+    displayOrder: row.display_order ?? null,
     autoplay: row.autoplay ?? false,
     tags: Array.isArray(row.tags) ? row.tags : [],
     views: row.views ?? 0,

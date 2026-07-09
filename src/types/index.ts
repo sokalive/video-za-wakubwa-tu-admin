@@ -38,6 +38,7 @@ export interface Video {
   isFeatured: boolean;
   isPinned: boolean;
   pinOrder: number | null;
+  displayOrder?: number | null;
   autoplay: boolean;
   tags: string[];
   views: number;
@@ -223,6 +224,7 @@ export interface PaymentStats {
   pendingCount: number;
   failedCount: number;
   recalculatedAt: string;
+  revenueResetAt?: string | null;
 }
 
 export interface DeviceSubscription {

@@ -4,6 +4,7 @@ export type VideoOptionalColumns = {
   vipTrialSeconds: boolean;
   pinColumns: boolean;
   dedupColumns: boolean;
+  displayOrder: boolean;
 };
 
 let columnCache: { at: number; cols: VideoOptionalColumns } | null = null;
@@ -14,16 +15,18 @@ export async function getVideoOptionalColumns(force = false): Promise<VideoOptio
     return columnCache.cols;
   }
 
-  const [vipProbe, pinProbe, dedupProbe] = await Promise.all([
+  const [vipProbe, pinProbe, dedupProbe, orderProbe] = await Promise.all([
     supabaseRest<unknown[]>("videos?select=id,vip_trial_seconds&limit=0"),
     supabaseRest<unknown[]>("videos?select=id,is_pinned,pin_order&limit=0"),
     supabaseRest<unknown[]>("videos?select=id,file_hash,file_size,source_file_name&limit=0"),
+    supabaseRest<unknown[]>("videos?select=id,display_order&limit=0"),
   ]);
 
   const cols: VideoOptionalColumns = {
     vipTrialSeconds: !vipProbe.error,
     pinColumns: !pinProbe.error,
     dedupColumns: !dedupProbe.error,
+    displayOrder: !orderProbe.error,
   };
   columnCache = { at: Date.now(), cols };
   return cols;
@@ -73,6 +76,10 @@ export function prepareVideoWriteRow(
     delete out.source_file_name;
   }
 
+  if (!cols.displayOrder) {
+    delete out.display_order;
+  }
+
   return out;
 }
 
@@ -101,6 +108,10 @@ export function prepareVideoUpdateData(
     delete out.file_hash;
     delete out.file_size;
     delete out.source_file_name;
+  }
+
+  if (!cols.displayOrder) {
+    delete out.display_order;
   }
 
   return out;

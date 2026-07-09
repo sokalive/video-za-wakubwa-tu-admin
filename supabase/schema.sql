@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS videos (
   is_featured BOOLEAN NOT NULL DEFAULT false,
   is_pinned BOOLEAN NOT NULL DEFAULT false,
   pin_order INT,
+  display_order INT,
   autoplay BOOLEAN NOT NULL DEFAULT false,
   views INT NOT NULL DEFAULT 0,
   likes_count INT NOT NULL DEFAULT 0,
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS videos (
 CREATE INDEX IF NOT EXISTS idx_videos_category ON videos(category_id);
 CREATE INDEX IF NOT EXISTS idx_videos_featured ON videos(is_featured);
 CREATE INDEX IF NOT EXISTS idx_videos_pinned ON videos(is_pinned, pin_order);
+CREATE INDEX IF NOT EXISTS idx_videos_display_order ON videos(display_order ASC, created_at ASC, id ASC);
 CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_videos_published ON videos(published);
 CREATE INDEX IF NOT EXISTS idx_videos_file_hash ON videos(file_hash) WHERE file_hash IS NOT NULL AND file_hash <> '';
@@ -174,6 +176,7 @@ CREATE TABLE IF NOT EXISTS site_settings (
   vip_trial_enabled BOOLEAN NOT NULL DEFAULT false,
   vip_trial_duration_value INT NOT NULL DEFAULT 5,
   vip_trial_duration_unit TEXT NOT NULL DEFAULT 'minutes',
+  revenue_reset_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -71,6 +71,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    reorder: (orderedIds: string[]) =>
+      fetchApi<{ success: boolean; updated: number }>("/videos/reorder", {
+        method: "POST",
+        body: JSON.stringify({ orderedIds }),
+      }),
     bulkDelete: (ids: string[]) =>
       fetchApi<{ success: boolean; data: { deleted: number } }>("/videos/bulk-delete", {
         method: "POST",
@@ -169,6 +174,12 @@ export const api = {
         "/payments/bulk-delete",
         { method: "POST", body: JSON.stringify({ ids }) }
       ),
+    resetRevenue: () =>
+      fetchApi<{
+        success: boolean;
+        revenueResetAt: string;
+        stats: import("@/types").PaymentStats;
+      }>("/payments/revenue-reset", { method: "POST" }),
   },
   subscriptions: {
     list: () =>

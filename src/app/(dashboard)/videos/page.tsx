@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Trash2, Crown, Star, Pin, ExternalLink, Film, Upload, Layers } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Crown, Star, Pin, ExternalLink, Film, Upload, Layers, GripVertical } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
@@ -98,6 +98,9 @@ export default function VideosPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [dragVideoId, setDragVideoId] = useState<string | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragVideoIdRef = useRef<string | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["videos", search, filterVip],
@@ -179,6 +182,13 @@ export default function VideosPage() {
       pinned: boolean;
       pinOrder?: number;
     }) => api.videos.setPin(id, { pinned, pinOrder }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["videos"] });
+    },
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: (orderedIds: string[]) => api.videos.reorder(orderedIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["videos"] });
     },
@@ -310,13 +320,8 @@ export default function VideosPage() {
     setForm({ ...form, tags: form.tags.filter((t) => t !== tag) });
   };
 
-  const videos = [...(data?.data || [])].sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    if (a.isPinned && b.isPinned) {
-      return (a.pinOrder ?? 9999) - (b.pinOrder ?? 9999);
-    }
-    return 0;
-  });
+  const videos = data?.data || [];
+  const reorderDisabled = Boolean(search) || filterVip !== "all";
   const categories = categoriesData?.data || [];
   const allSelected = videos.length > 0 && videos.every((v) => selected.has(v.id));
   const selectedCount = videos.filter((v) => selected.has(v.id)).length;
@@ -337,6 +342,19 @@ export default function VideosPage() {
 
   const playbackLink = (video: Video) =>
     video.videoStorage === "r2" && video.videoUrl ? video.videoUrl : video.googleDriveUrl;
+
+  const commitReorder = useCallback(
+    (fromId: string, toIndex: number) => {
+      const ids = videos.map((v) => v.id);
+      const fromIndex = ids.indexOf(fromId);
+      if (fromIndex < 0 || fromIndex === toIndex) return;
+      const next = [...ids];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      reorderMutation.mutate(next);
+    },
+    [videos, reorderMutation]
+  );
 
   return (
     <DashboardShell title="Videos">
@@ -402,6 +420,8 @@ export default function VideosPage() {
               <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10" title={reorderDisabled ? "Clear filters to reorder" : "Drag handle"} />
+                    <TableHead className="w-10 text-xs text-gray-500">#</TableHead>
                     <TableHead className="sticky left-0 z-10 w-[72px] bg-[#12121f] sm:w-[88px]">
                       Thumbnail
                     </TableHead>
@@ -418,8 +438,51 @@ export default function VideosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {videos.map((video) => (
-                    <TableRow key={video.id}>
+                  {videos.map((video, index) => (
+                    <TableRow
+                      key={video.id}
+                      className={
+                        dragOverIndex === index && dragVideoId !== video.id
+                          ? "border-t-2 border-t-primary"
+                          : undefined
+                      }
+                      onDragOver={(e) => {
+                        if (reorderDisabled || reorderMutation.isPending) return;
+                        e.preventDefault();
+                        setDragOverIndex(index);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const from = dragVideoIdRef.current;
+                        setDragVideoId(null);
+                        setDragOverIndex(null);
+                        dragVideoIdRef.current = null;
+                        if (from) commitReorder(from, index);
+                      }}
+                    >
+                      <TableCell className="w-10 p-1">
+                        <button
+                          type="button"
+                          draggable={!reorderDisabled && !reorderMutation.isPending}
+                          disabled={reorderDisabled || reorderMutation.isPending}
+                          title={reorderDisabled ? "Clear search/filters to reorder" : "Drag to reorder"}
+                          className="flex h-9 w-9 cursor-grab items-center justify-center rounded-md text-gray-400 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+                          onDragStart={(e) => {
+                            dragVideoIdRef.current = video.id;
+                            setDragVideoId(video.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", video.id);
+                          }}
+                          onDragEnd={() => {
+                            setDragVideoId(null);
+                            setDragOverIndex(null);
+                            dragVideoIdRef.current = null;
+                          }}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500 tabular-nums w-10">{index + 1}</TableCell>
                       <TableCell className="sticky left-0 z-10 bg-[#12121f] py-2">
                         <VideoThumbnailCell video={video} onEdit={() => openEdit(video)} />
                       </TableCell>

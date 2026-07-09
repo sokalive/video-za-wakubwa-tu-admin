@@ -1,6 +1,10 @@
 import { getSupabaseAdmin } from "./client";
 import { supabaseRest } from "./rest";
 import { listTransactionsAdmin } from "@/lib/payments/billing-store";
+import {
+  getRevenueResetAt,
+  transactionCountsTowardRevenue,
+} from "@/lib/db/revenue-baseline";
 import type { AnalyticsData, BillingTransaction, DashboardStats, User } from "@/types";
 
 type TxnRow = {
@@ -50,18 +54,24 @@ async function safeRest<T>(path: string): Promise<T[]> {
 }
 
 export async function computePaymentStats() {
-  const rows = await listTransactionsAdmin();
-  const completed = rows.filter((r) => r.status === "completed");
+  const [rows, revenueResetAt] = await Promise.all([
+    listTransactionsAdmin(),
+    getRevenueResetAt(),
+  ]);
+  const completed = rows.filter((r) =>
+    transactionCountsTowardRevenue(r.created_at, r.status, revenueResetAt)
+  );
   const pending = rows.filter((r) => r.status === "pending");
   const failed = rows.filter((r) => r.status === "failed");
   const totalRevenue = completed.reduce((s, r) => s + (r.amount ?? 0), 0);
   return {
     totalRevenue,
     totalTransactions: rows.length,
-    completedCount: completed.length,
+    completedCount: rows.filter((r) => r.status === "completed").length,
     pendingCount: pending.length,
     failedCount: failed.length,
     recalculatedAt: new Date().toISOString(),
+    revenueResetAt,
   };
 }
 
